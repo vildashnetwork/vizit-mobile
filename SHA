@@ -1,0 +1,14 @@
+$keyPath = "$HOME\.android\debug.keystore"
+$keytoolPath = "C:\Program Files\Android\Android Studio\jbr\bin\keytool.exe"
+
+if (Test-Path $keytoolPath) {
+    & $keytoolPath -list -v -keystore $keyPath -alias androiddebugkey -storepass android -keypass android
+} else {
+    Write-Host "Searching for keytool.exe elsewhere..."
+    $manualSearch = Get-ChildItem -Path "C:\Program Files" -Filter "keytool.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($manualSearch) {
+        & $manualSearch.FullName -list -v -keystore $keyPath -alias androiddebugkey -storepass android -keypass android
+    } else {
+        Write-Host "Keytool not found. Please ensure Android Studio is installed."
+    }
+}

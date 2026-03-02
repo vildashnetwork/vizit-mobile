@@ -1,0 +1,1494 @@
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import {
+    View,
+    Text,
+    StyleSheet,
+    FlatList,
+    Image,
+    TouchableOpacity,
+    ActivityIndicator,
+    TextInput,
+    KeyboardAvoidingView,
+    Platform,
+    Modal,
+    StatusBar,
+    SafeAreaView,
+    Dimensions,
+    Alert,
+    ScrollView,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import axios from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
+import * as VideoThumbnails from "expo-video-thumbnails";
+import { Video, ResizeMode } from "expo-av";
+import { getSocket } from "../me";
+import * as Haptics from "expo-haptics";
+
+const { width, height } = Dimensions.get("window");
+const API = "https://vizit-backend-hubw.onrender.com/api";
+
+/* ================= TYPES ================= */
+
+type User = {
+    _id: string;
+    name: string;
+    email: string;
+    profile: string;
+    role?: string;
+    verified?: boolean;
+    allchatsId?: string[];
+};
+
+type Message = {
+    _id?: string;
+    senderId: string;
+    receiverId: string;
+    text?: string;
+    image?: string;
+    video?: string;
+    audio?: string;
+    createdAt: string;
+    readistrue?: boolean;
+    temp?: boolean;
+    failed?: boolean;
+};
+
+type ChatUser = {
+    _id: string;
+    name: string;
+    email: string;
+    profile: string;
+    role?: string;
+    verified?: boolean;
+    lastMessage?: string;
+};
+
+/* ================= MAIN CHAT SCREEN ================= */
+
+export default function ChatScreen({ setActiveTab }: { setActiveTab?: (tab: string) => void }) {
+    const router = useRouter();
+    const [user, setUser] = useState<User | null>(null);
+    const [chats, setChats] = useState<ChatUser[]>([]);
+    const [messages, setMessages] = useState<Record<string, Message[]>>({});
+    const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+    const [typingUsers, setTypingUsers] = useState<Record<string, boolean>>({});
+    const [activeChatId, setActiveChatId] = useState<string | null>(null);
+    const [loadingChats, setLoadingChats] = useState(true);
+    const [loadingMessages, setLoadingMessages] = useState<Record<string, boolean>>({});
+    const [searchQuery, setSearchQuery] = useState("");
+    const [sidebarVisible, setSidebarVisible] = useState(true);
+    const [showGallery, setShowGallery] = useState(false);
+    const [galleryImages, setGalleryImages] = useState<string[]>([]);
+    const [galleryIndex, setGalleryIndex] = useState(0);
+    const [showVideoCall, setShowVideoCall] = useState(false);
+    const [incomingCall, setIncomingCall] = useState(false);
+    const [callerInfo, setCallerInfo] = useState<any>(null);
+    const [callActive, setCallActive] = useState(false);
+    const [isMuted, setIsMuted] = useState(false);
+    const [isVideoOff, setIsVideoOff] = useState(false);
+    const [localStream, setLocalStream] = useState<any>(null);
+    const [remoteStream, setRemoteStream] = useState<any>(null);
+
+    const socket = getSocket();
+
+    /* ================= DECODE TOKEN ================= */
+    const decodeToken = useCallback(async () => {
+        try {
+            const token = await AsyncStorage.getItem("userToken");
+            if (!token) return;
+
+            const res = await axios.get(`${API}/owner/decode/token/owner`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            setUser(res.data.res);
+            await AsyncStorage.setItem("userId", res.data.res._id);
+        } catch (err) {
+            console.error("Decode token failed", err);
+        }
+    }, []);
+
+    /* ================= FETCH CHAT USERS ================= */
+    const fetchChats = useCallback(async (userId: string) => {
+        try {
+            setLoadingChats(true);
+            const res = await axios.get(`${API}/messages/users/${userId}`);
+            const { filteredUsers, filteredOwners } = res.data;
+            setChats([...filteredOwners, ...filteredUsers]);
+        } catch (err) {
+            console.error("Fetch chats failed", err);
+        } finally {
+            setLoadingChats(false);
+        }
+    }, []);
+
+    /* ================= LOAD MESSAGES ================= */
+    const loadMessages = async (chatId: string) => {
+        if (!user?._id) return;
+
+        setActiveChatId(chatId);
+        setSidebarVisible(false);
+        setLoadingMessages(prev => ({ ...prev, [chatId]: true }));
+
+        try {
+            const res = await axios.get(`${API}/messages/${chatId}`, {
+                params: { myId: user._id },
+            });
+
+            setMessages(prev => ({ ...prev, [chatId]: res.data }));
+
+            // Mark as read
+            await axios.put(`${API}/messages/read/${chatId}`, {
+                readerId: user._id,
+            });
+
+            // Emit socket event
+            socket?.emit("markMessagesRead", {
+                chatUserId: chatId,
+                readerId: user._id,
+            });
+        } catch (err) {
+            console.error("Load messages failed", err);
+        } finally {
+            setLoadingMessages(prev => ({ ...prev, [chatId]: false }));
+        }
+    };
+
+    /* ================= SEND MESSAGE ================= */
+    const sendMessage = async (
+        chatId: string,
+        { text = "", imageFile = null, videoFile = null }
+    ) => {
+        if (!text.trim() && !imageFile && !videoFile) return;
+        if (!user?._id) return;
+
+        const tempMessage: Message = {
+            senderId: user._id,
+            receiverId: chatId,
+            text: text || '',
+            createdAt: new Date().toISOString(),
+            temp: true,
+        };
+
+        // Optimistic update
+        setMessages(prev => ({
+            ...prev,
+            [chatId]: [...(prev[chatId] || []), tempMessage],
+        }));
+
+        try {
+            const formData = new FormData();
+            formData.append('senderId', user._id);
+            if (text) formData.append('text', text);
+            
+            if (imageFile) {
+                formData.append('image', {
+                    uri: imageFile.uri,
+                    type: 'image/jpeg',
+                    name: 'image.jpg',
+                } as any);
+            }
+            
+            if (videoFile) {
+                formData.append('video', {
+                    uri: videoFile.uri,
+                    type: 'video/mp4',
+                    name: 'video.mp4',
+                } as any);
+            }
+
+            const res = await axios.post(`${API}/messages/send/${chatId}`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+
+            // Replace temp message
+            setMessages(prev => ({
+                ...prev,
+                [chatId]: prev[chatId].map(msg =>
+                    msg === tempMessage ? res.data : msg
+                ),
+            }));
+
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch (error) {
+            console.error("Failed to send message:", error);
+            setMessages(prev => ({
+                ...prev,
+                [chatId]: prev[chatId].map(msg =>
+                    msg === tempMessage ? { ...msg, failed: true } : msg
+                ),
+            }));
+        }
+    };
+
+    /* ================= SOCKET SETUP ================= */
+    useEffect(() => {
+        if (!user?._id) return;
+
+        socket?.emit("registerUser", user._id);
+
+        socket?.on("typingStatus", ({ byUserId, isTyping }) => {
+            setTypingUsers(prev => ({ ...prev, [byUserId]: isTyping }));
+        });
+
+        socket?.on("newMessage", (msg: Message) => {
+            const chatId = msg.senderId === user._id ? msg.receiverId : msg.senderId;
+
+            setMessages(prev => {
+                const existing = prev[chatId] || [];
+                const filtered = existing.filter(m => !(m.temp && m.senderId === msg.senderId));
+                if (filtered.some(m => m._id === msg._id)) return prev;
+                return { ...prev, [chatId]: [...filtered, msg] };
+            });
+        });
+
+        socket?.on("messagesRead", ({ byUserId }) => {
+            setMessages(prev => {
+                const updated = { ...prev };
+                Object.keys(updated).forEach(chatId => {
+                    updated[chatId] = updated[chatId].map(m =>
+                        m.senderId === user._id && m.receiverId === byUserId
+                            ? { ...m, readistrue: true }
+                            : m
+                    );
+                });
+                return updated;
+            });
+        });
+
+        socket?.on("getOnlineUsers", (users: string[]) => {
+            setOnlineUsers(users);
+        });
+
+        socket?.on("incoming:call", async ({ fromUserId, offer, callerName }) => {
+            setCallerInfo({ userId: fromUserId, name: callerName });
+            setIncomingCall(true);
+        });
+
+        socket?.on("call:accepted", ({ answer }) => {
+            setCallActive(true);
+        });
+
+        socket?.on("call:end", () => {
+            endCall();
+        });
+
+        return () => {
+            socket?.off("typingStatus");
+            socket?.off("newMessage");
+            socket?.off("messagesRead");
+            socket?.off("getOnlineUsers");
+            socket?.off("incoming:call");
+            socket?.off("call:accepted");
+            socket?.off("call:end");
+        };
+    }, [user?._id]);
+
+    /* ================= MARK MESSAGES AS READ ================= */
+    useEffect(() => {
+        if (!activeChatId || !messages[activeChatId] || !user?._id) return;
+
+        const unreadMessages = messages[activeChatId].filter(
+            msg => msg.receiverId === user._id && !msg.readistrue
+        );
+
+        if (unreadMessages.length === 0) return;
+
+        setMessages(prev => ({
+            ...prev,
+            [activeChatId]: prev[activeChatId].map(msg =>
+                msg.receiverId === user._id ? { ...msg, readistrue: true } : msg
+            ),
+        }));
+
+        socket?.emit("markMessagesRead", {
+            chatUserId: activeChatId,
+            readerId: user._id,
+        });
+
+        axios.put(`${API}/messages/read/${activeChatId}`, { readerId: user._id })
+            .catch(err => console.error("Failed to mark messages read:", err));
+    }, [activeChatId, messages, user?._id]);
+
+    /* ================= INITIAL LOAD ================= */
+    useEffect(() => {
+        decodeToken();
+    }, []);
+
+    useEffect(() => {
+        if (user?._id) fetchChats(user._id);
+    }, [user?._id]);
+
+    /* ================= TYPING HANDLER ================= */
+    const handleTyping = (isTyping: boolean) => {
+        if (!socket || !activeChatId) return;
+        socket.emit("typing", {
+            chatUserId: activeChatId,
+            isTyping,
+        });
+    };
+
+    /* ================= IMAGE GALLERY ================= */
+    const openGallery = async (chatId: string) => {
+        if (!user?._id) return;
+
+        try {
+            const res = await axios.get(`${API}/messages/${chatId}`, {
+                params: { myId: user._id },
+            });
+
+            const images = res.data
+                .filter((m: Message) => m.image)
+                .map((m: Message) => m.image);
+
+            setGalleryImages(images);
+            setGalleryIndex(0);
+            setShowGallery(true);
+        } catch (err) {
+            console.error("Failed to load gallery:", err);
+        }
+    };
+
+    /* ================= VIDEO CALL ================= */
+    const startCall = async () => {
+        if (!activeChatId) return;
+        
+        setShowVideoCall(true);
+        setCallActive(true);
+        
+        socket?.emit("user:call", {
+            toUserId: activeChatId,
+            offer: JSON.stringify({ type: "offer" }),
+            callerName: user?.name,
+        });
+    };
+
+    const acceptCall = () => {
+        setIncomingCall(false);
+        setShowVideoCall(true);
+        setCallActive(true);
+        
+        socket?.emit("call:accepted", {
+            toUserId: callerInfo.userId,
+            answer: JSON.stringify({ type: "answer" }),
+        });
+    };
+
+    const rejectCall = () => {
+        socket?.emit("call:rejected", { toUserId: callerInfo.userId });
+        setIncomingCall(false);
+    };
+
+    const endCall = () => {
+        socket?.emit("call:end", { toUserId: activeChatId || callerInfo?.userId });
+        setCallActive(false);
+        setShowVideoCall(false);
+        setLocalStream(null);
+        setRemoteStream(null);
+    };
+
+    const toggleMute = () => {
+        setIsMuted(!isMuted);
+        // Implement audio toggle
+    };
+
+    const toggleVideo = () => {
+        setIsVideoOff(!isVideoOff);
+        // Implement video toggle
+    };
+
+    /* ================= FILTER CHATS ================= */
+    const filteredChats = chats.filter(chat =>
+        chat.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    /* ================= RENDER ================= */
+    if (!user) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#10ca8c" />
+            </View>
+        );
+    }
+
+    return (
+        <SafeAreaView style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+
+            {sidebarVisible ? (
+                /* ================= CHAT LIST SIDEBAR ================= */
+                <View style={styles.sidebar}>
+                    {/* Header */}
+                    <View style={styles.sidebarHeader}>
+                        <View style={styles.userInfo}>
+                            <Image
+                                source={{ uri: user.profile || "https://via.placeholder.com/40" }}
+                                style={styles.userAvatar}
+                            />
+                            <Text style={styles.userName}>{user.name}</Text>
+                        </View>
+                        <View style={styles.headerActions}>
+                            <TouchableOpacity
+                                style={styles.headerIcon}
+                                onPress={() => setActiveTab?.("feed")}
+                            >
+                                <Ionicons name="add-circle-outline" size={24} color="#333" />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* Search */}
+                    <View style={styles.searchContainer}>
+                        <Ionicons name="search-outline" size={20} color="#999" style={styles.searchIcon} />
+                        <TextInput
+                            style={styles.searchInput}
+                            placeholder="Search chats..."
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            placeholderTextColor="#999"
+                        />
+                    </View>
+
+                    {/* Chat List */}
+                    {loadingChats ? (
+                        <View style={styles.loadingChats}>
+                            <ActivityIndicator size="large" color="#10ca8c" />
+                        </View>
+                    ) : (
+                        <FlatList
+                            data={filteredChats}
+                            keyExtractor={(item) => item._id}
+                            contentContainerStyle={styles.chatList}
+                            ListEmptyComponent={
+                                <View style={styles.emptyChats}>
+                                    <Ionicons name="chatbubbles-outline" size={50} color="#ccc" />
+                                    <Text style={styles.emptyChatsText}>No chats found</Text>
+                                </View>
+                            }
+                            renderItem={({ item }) => {
+                                const isOnline = onlineUsers.includes(item._id);
+                                const isTyping = typingUsers[item._id];
+                                const lastMessage = messages[item._id]?.slice(-1)[0];
+                                const unreadCount = messages[item._id]?.filter(
+                                    m => m.receiverId === user._id && !m.readistrue
+                                ).length || 0;
+
+                                return (
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.chatItem,
+                                            activeChatId === item._id && styles.activeChatItem,
+                                        ]}
+                                        onPress={() => loadMessages(item._id)}
+                                    >
+                                        <Image
+                                            source={{ uri: item.profile || "https://via.placeholder.com/50" }}
+                                            style={styles.chatAvatar}
+                                        />
+                                        <View style={styles.chatInfo}>
+                                            <View style={styles.chatHeader}>
+                                                <Text style={styles.chatName}>
+                                                    {item.name.slice(0, 15)}
+                                                    {item.role === "owner" && item.verified && (
+                                                        <Ionicons name="checkmark-circle" size={14} color="#10ca8c" />
+                                                    )}
+                                                </Text>
+                                                {isTyping ? (
+                                                    <Text style={styles.typingText}>typing...</Text>
+                                                ) : (
+                                                    <Text style={[
+                                                        styles.onlineStatus,
+                                                        isOnline ? styles.online : styles.offline,
+                                                    ]}>
+                                                        {isOnline ? "online" : "offline"}
+                                                    </Text>
+                                                )}
+                                            </View>
+                                            <View style={styles.chatFooter}>
+                                                <Text style={styles.lastMessage} numberOfLines={1}>
+                                                    {lastMessage?.text
+                                                        ? lastMessage.text
+                                                        : lastMessage?.image
+                                                        ? "📷 Image"
+                                                        : lastMessage?.video
+                                                        ? "🎥 Video"
+                                                        : "No messages yet"}
+                                                </Text>
+                                                {unreadCount > 0 && (
+                                                    <View style={styles.unreadBadge}>
+                                                        <Text style={styles.unreadText}>{unreadCount}</Text>
+                                                    </View>
+                                                )}
+                                            </View>
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            }}
+                        />
+                    )}
+                </View>
+            ) : (
+                /* ================= CHAT MAIN ================= */
+                <KeyboardAvoidingView
+                    style={styles.chatMain}
+                    behavior={Platform.OS === "ios" ? "padding" : "height"}
+                    keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+                >
+                    {/* Chat Header */}
+                    <View style={styles.chatHeader}>
+                        <TouchableOpacity
+                            style={styles.backButton}
+                            onPress={() => {
+                                setActiveChatId(null);
+                                setSidebarVisible(true);
+                            }}
+                        >
+                            <Ionicons name="arrow-back" size={24} color="#333" />
+                        </TouchableOpacity>
+
+                        {activeChatId && (
+                            <>
+                                <View style={styles.chatUserInfo}>
+                                    <Image
+                                        source={{
+                                            uri: chats.find(c => c._id === activeChatId)?.profile ||
+                                                "https://via.placeholder.com/40",
+                                        }}
+                                        style={styles.chatUserAvatar}
+                                    />
+                                    <View>
+                                        <Text style={styles.chatUserName}>
+                                            {chats.find(c => c._id === activeChatId)?.name}
+                                        </Text>
+                                        {typingUsers[activeChatId] ? (
+                                            <Text style={styles.chatUserTyping}>typing...</Text>
+                                        ) : (
+                                            <Text style={[
+                                                styles.chatUserStatus,
+                                                onlineUsers.includes(activeChatId) ? styles.online : styles.offline,
+                                            ]}>
+                                                {onlineUsers.includes(activeChatId) ? "online" : "offline"}
+                                            </Text>
+                                        )}
+                                    </View>
+                                </View>
+
+                                <View style={styles.chatActions}>
+                                    <TouchableOpacity style={styles.chatAction} onPress={startCall}>
+                                        <Ionicons name="videocam-outline" size={24} color="#333" />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.chatAction} onPress={() => openGallery(activeChatId)}>
+                                        <Ionicons name="images-outline" size={24} color="#333" />
+                                    </TouchableOpacity>
+                                </View>
+                            </>
+                        )}
+                    </View>
+
+                    {/* Messages */}
+                    {activeChatId && (
+                        <>
+                            {loadingMessages[activeChatId] ? (
+                                <View style={styles.loadingMessages}>
+                                    <ActivityIndicator size="large" color="#10ca8c" />
+                                </View>
+                            ) : (
+                                <FlatList
+                                    data={messages[activeChatId] || []}
+                                    keyExtractor={(item, index) => item._id || index.toString()}
+                                    contentContainerStyle={styles.messagesList}
+                                    inverted={false}
+                                    renderItem={({ item }) => {
+                                        const isMine = item.senderId === user._id;
+
+                                        return (
+                                            <View style={[
+                                                styles.messageWrapper,
+                                                isMine ? styles.myMessage : styles.theirMessage,
+                                            ]}>
+                                                {item.image && (
+                                                    <TouchableOpacity
+                                                        onPress={() => {
+                                                            setGalleryImages([item.image!]);
+                                                            setGalleryIndex(0);
+                                                            setShowGallery(true);
+                                                        }}
+                                                    >
+                                                        <Image
+                                                            source={{ uri: item.image }}
+                                                            style={styles.messageImage}
+                                                        />
+                                                    </TouchableOpacity>
+                                                )}
+                                                {item.video && (
+                                                    <Video
+                                                        source={{ uri: item.video }}
+                                                        style={styles.messageVideo}
+                                                        useNativeControls
+                                                        resizeMode={ResizeMode.CONTAIN}
+                                                    />
+                                                )}
+                                                {item.text && (
+                                                    <Text style={[
+                                                        styles.messageText,
+                                                        isMine ? styles.myMessageText : styles.theirMessageText,
+                                                    ]}>
+                                                        {item.text}
+                                                    </Text>
+                                                )}
+                                                <View style={styles.messageMeta}>
+                                                    <Text style={styles.messageTime}>
+                                                        {new Date(item.createdAt).toLocaleTimeString([], {
+                                                            hour: '2-digit',
+                                                            minute: '2-digit',
+                                                        })}
+                                                    </Text>
+                                                    {isMine && item.readistrue && (
+                                                        <Ionicons name="checkmark-done" size={16} color="#10ca8c" />
+                                                    )}
+                                                    {item.failed && (
+                                                        <Text style={styles.failedText}>Failed</Text>
+                                                    )}
+                                                </View>
+                                            </View>
+                                        );
+                                    }}
+                                />
+                            )}
+
+                            {/* Chat Input */}
+                            <ChatInput
+                                onSend={(text, imageFile, videoFile) =>
+                                    sendMessage(activeChatId, { text, imageFile, videoFile })
+                                }
+                                onTyping={handleTyping}
+                            />
+                        </>
+                    )}
+                </KeyboardAvoidingView>
+            )}
+
+            {/* Image Gallery Modal */}
+            <Modal visible={showGallery} transparent={true} animationType="fade">
+                <View style={styles.galleryOverlay}>
+                    <View style={styles.galleryContainer}>
+                        <TouchableOpacity
+                            style={styles.galleryClose}
+                            onPress={() => setShowGallery(false)}
+                        >
+                            <Ionicons name="close" size={30} color="#fff" />
+                        </TouchableOpacity>
+
+                        <Text style={styles.galleryCounter}>
+                            {galleryIndex + 1} / {galleryImages.length}
+                        </Text>
+
+                        <Image
+                            source={{ uri: galleryImages[galleryIndex] }}
+                            style={styles.galleryImage}
+                            resizeMode="contain"
+                        />
+
+                        <View style={styles.galleryControls}>
+                            <TouchableOpacity
+                                style={styles.galleryControl}
+                                disabled={galleryIndex === 0}
+                                onPress={() => setGalleryIndex(i => i - 1)}
+                            >
+                                <Ionicons name="chevron-back" size={30} color="#fff" />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.galleryControl}
+                                disabled={galleryIndex === galleryImages.length - 1}
+                                onPress={() => setGalleryIndex(i => i + 1)}
+                            >
+                                <Ionicons name="chevron-forward" size={30} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Incoming Call Modal */}
+            <Modal visible={incomingCall} transparent={true} animationType="slide">
+                <View style={styles.callOverlay}>
+                    <View style={styles.callContainer}>
+                        <Text style={styles.callTitle}>Incoming Video Call</Text>
+                        <Text style={styles.callerName}>{callerInfo?.name}</Text>
+                        <View style={styles.callActions}>
+                            <TouchableOpacity
+                                style={[styles.callButton, styles.acceptButton]}
+                                onPress={acceptCall}
+                            >
+                                <Ionicons name="videocam" size={30} color="#fff" />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.callButton, styles.rejectButton]}
+                                onPress={rejectCall}
+                            >
+                                <Ionicons name="close" size={30} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Video Call Modal */}
+            <Modal visible={showVideoCall} transparent={true} animationType="slide">
+                <View style={styles.videoCallOverlay}>
+                    <View style={styles.videoCallContainer}>
+                        {/* Remote Video */}
+                        <View style={styles.remoteVideo}>
+                            {remoteStream ? (
+                                <Text>Remote Video</Text>
+                            ) : (
+                                <View style={styles.waitingContainer}>
+                                    <ActivityIndicator size="large" color="#fff" />
+                                    <Text style={styles.waitingText}>Waiting for answer...</Text>
+                                </View>
+                            )}
+                        </View>
+
+                        {/* Local Video */}
+                        <View style={styles.localVideo}>
+                            {localStream ? (
+                                <Text>Local Video</Text>
+                            ) : (
+                                <View style={styles.localVideoPlaceholder}>
+                                    <Ionicons name="videocam-off" size={30} color="#fff" />
+                                </View>
+                            )}
+                        </View>
+
+                        {/* Call Controls */}
+                        <View style={styles.videoCallControls}>
+                            <TouchableOpacity style={styles.videoCallControl} onPress={toggleMute}>
+                                <Ionicons
+                                    name={isMuted ? "mic-off" : "mic"}
+                                    size={24}
+                                    color="#fff"
+                                />
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.videoCallControl} onPress={toggleVideo}>
+                                <Ionicons
+                                    name={isVideoOff ? "videocam-off" : "videocam"}
+                                    size={24}
+                                    color="#fff"
+                                />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.videoCallControl, styles.endCallControl]}
+                                onPress={endCall}
+                            >
+                                <Ionicons name="call" size={24} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+        </SafeAreaView>
+    );
+}
+
+/* ================= CHAT INPUT COMPONENT ================= */
+
+interface ChatInputProps {
+    onSend: (text: string, imageFile: any, videoFile: any) => void;
+    onTyping: (isTyping: boolean) => void;
+}
+
+const ChatInput = ({ onSend, onTyping }: ChatInputProps) => {
+    const [message, setMessage] = useState("");
+    const [imageFile, setImageFile] = useState<any>(null);
+    const [videoFile, setVideoFile] = useState<any>(null);
+    const inputRef = useRef<TextInput>(null);
+
+    const handleSend = () => {
+        if (!message.trim() && !imageFile && !videoFile) return;
+        onSend(message, imageFile, videoFile);
+        setMessage("");
+        setImageFile(null);
+        setVideoFile(null);
+        onTyping(false);
+    };
+
+    const pickImage = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            quality: 0.7,
+        });
+        if (!result.canceled) {
+            setImageFile(result.assets[0]);
+        }
+    };
+
+    const pickVideo = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+            quality: 0.7,
+        });
+        if (!result.canceled) {
+            setVideoFile(result.assets[0]);
+        }
+    };
+
+    return (
+        <View style={styles.inputContainer}>
+            {(imageFile || videoFile) && (
+                <View style={styles.previewContainer}>
+                    {imageFile && (
+                        <View style={styles.previewItem}>
+                            <Image source={{ uri: imageFile.uri }} style={styles.previewImage} />
+                            <TouchableOpacity
+                                style={styles.removePreview}
+                                onPress={() => setImageFile(null)}
+                            >
+                                <Ionicons name="close-circle" size={20} color="#ff4444" />
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                    {videoFile && (
+                        <View style={styles.previewItem}>
+                            <Video
+                                source={{ uri: videoFile.uri }}
+                                style={styles.previewVideo}
+                                shouldPlay={false}
+                                useNativeControls
+                            />
+                            <TouchableOpacity
+                                style={styles.removePreview}
+                                onPress={() => setVideoFile(null)}
+                            >
+                                <Ionicons name="close-circle" size={20} color="#ff4444" />
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                </View>
+            )}
+
+            <View style={styles.inputRow}>
+                <TouchableOpacity style={styles.attachButton} onPress={pickImage}>
+                    <Ionicons name="image-outline" size={24} color="#10ca8c" />
+                </TouchableOpacity>
+                
+                <TouchableOpacity style={styles.attachButton} onPress={pickVideo}>
+                    <Ionicons name="videocam-outline" size={24} color="#10ca8c" />
+                </TouchableOpacity>
+
+                <TextInput
+                    ref={inputRef}
+                    style={styles.textInput}
+                    placeholder="Type a message..."
+                    value={message}
+                    onChangeText={(text) => {
+                        setMessage(text);
+                        onTyping(text.length > 0);
+                    }}
+                    multiline
+                    maxLength={1000}
+                />
+
+                <TouchableOpacity
+                    style={[
+                        styles.sendButton,
+                        (!message.trim() && !imageFile && !videoFile) && styles.sendButtonDisabled,
+                    ]}
+                    onPress={handleSend}
+                    disabled={!message.trim() && !imageFile && !videoFile}
+                >
+                    <Ionicons name="send" size={20} color="#fff" />
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+};
+
+/* ================= STYLES ================= */
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: "#fff",
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    /* Sidebar */
+    sidebar: {
+        flex: 1,
+        backgroundColor: "#fff",
+    },
+    sidebarHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: "#f0f0f0",
+    },
+    userInfo: {
+        flexDirection: "row",
+        alignItems: "center",
+    },
+    userAvatar: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        marginRight: 12,
+    },
+    userName: {
+        fontSize: 16,
+        fontWeight: "600",
+        color: "#333",
+    },
+    headerActions: {
+        flexDirection: "row",
+    },
+    headerIcon: {
+        marginLeft: 16,
+    },
+    searchContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#f5f5f5",
+        margin: 16,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        height: 40,
+    },
+    searchIcon: {
+        marginRight: 8,
+    },
+    searchInput: {
+        flex: 1,
+        fontSize: 14,
+        color: "#333",
+    },
+    loadingChats: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    chatList: {
+        paddingHorizontal: 16,
+    },
+    emptyChats: {
+        alignItems: "center",
+        paddingVertical: 40,
+    },
+    emptyChatsText: {
+        marginTop: 10,
+        fontSize: 14,
+        color: "#999",
+    },
+    chatItem: {
+        flexDirection: "row",
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: "#f5f5f5",
+    },
+    activeChatItem: {
+        backgroundColor: "#f0fff9",
+    },
+    chatAvatar: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        marginRight: 12,
+    },
+    chatInfo: {
+        flex: 1,
+    },
+    chatHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 4,
+    },
+    chatName: {
+        fontSize: 15,
+        fontWeight: "600",
+        color: "#333",
+    },
+    typingText: {
+        fontSize: 11,
+        color: "#10ca8c",
+        fontStyle: "italic",
+    },
+    onlineStatus: {
+        fontSize: 11,
+    },
+    online: {
+        color: "#10ca8c",
+    },
+    offline: {
+        color: "#999",
+    },
+    chatFooter: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+    },
+    lastMessage: {
+        flex: 1,
+        fontSize: 13,
+        color: "#666",
+        marginRight: 8,
+    },
+    unreadBadge: {
+        backgroundColor: "#10ca8c",
+        borderRadius: 10,
+        minWidth: 20,
+        height: 20,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    unreadText: {
+        color: "#fff",
+        fontSize: 11,
+        fontWeight: "600",
+    },
+    /* Chat Main */
+    chatMain: {
+        flex: 1,
+        backgroundColor: "#fafafa",
+    },
+    chatHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: "#fff",
+        borderBottomWidth: 1,
+        borderBottomColor: "#f0f0f0",
+    },
+    backButton: {
+        marginRight: 12,
+    },
+    chatUserInfo: {
+        flex: 1,
+        flexDirection: "row",
+        alignItems: "center",
+    },
+    chatUserAvatar: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        marginRight: 12,
+    },
+    chatUserName: {
+        fontSize: 15,
+        fontWeight: "600",
+        color: "#333",
+    },
+    chatUserTyping: {
+        fontSize: 11,
+        color: "#10ca8c",
+        fontStyle: "italic",
+    },
+    chatUserStatus: {
+        fontSize: 11,
+    },
+    chatActions: {
+        flexDirection: "row",
+    },
+    chatAction: {
+        marginLeft: 16,
+    },
+    loadingMessages: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    messagesList: {
+        padding: 16,
+    },
+    messageWrapper: {
+        marginBottom: 12,
+        maxWidth: "80%",
+    },
+    myMessage: {
+        alignSelf: "flex-end",
+    },
+    theirMessage: {
+        alignSelf: "flex-start",
+    },
+    messageText: {
+        fontSize: 14,
+        padding: 12,
+        borderRadius: 18,
+        overflow: "hidden",
+    },
+    myMessageText: {
+        backgroundColor: "#10ca8c",
+        color: "#fff",
+    },
+    theirMessageText: {
+        backgroundColor: "#f0f0f0",
+        color: "#333",
+    },
+    messageImage: {
+        width: 200,
+        height: 200,
+        borderRadius: 12,
+        marginBottom: 4,
+    },
+    messageVideo: {
+        width: 200,
+        height: 200,
+        borderRadius: 12,
+        marginBottom: 4,
+    },
+    messageMeta: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "flex-end",
+        marginTop: 4,
+    },
+    messageTime: {
+        fontSize: 10,
+        color: "#999",
+        marginRight: 4,
+    },
+    failedText: {
+        fontSize: 10,
+        color: "#ff4444",
+        marginLeft: 4,
+    },
+    /* Input */
+    inputContainer: {
+        backgroundColor: "#fff",
+        borderTopWidth: 1,
+        borderTopColor: "#f0f0f0",
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+    },
+    previewContainer: {
+        flexDirection: "row",
+        marginBottom: 12,
+    },
+    previewItem: {
+        position: "relative",
+        marginRight: 12,
+    },
+    previewImage: {
+        width: 60,
+        height: 60,
+        borderRadius: 8,
+    },
+    previewVideo: {
+        width: 60,
+        height: 60,
+        borderRadius: 8,
+        backgroundColor: "#000",
+    },
+    removePreview: {
+        position: "absolute",
+        top: -6,
+        right: -6,
+        backgroundColor: "#fff",
+        borderRadius: 10,
+    },
+    inputRow: {
+        flexDirection: "row",
+        alignItems: "center",
+    },
+    attachButton: {
+        marginRight: 12,
+    },
+    textInput: {
+        flex: 1,
+        minHeight: 40,
+        maxHeight: 100,
+        backgroundColor: "#f5f5f5",
+        borderRadius: 20,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        fontSize: 14,
+        marginRight: 12,
+    },
+    sendButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: "#10ca8c",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    sendButtonDisabled: {
+        backgroundColor: "#ccc",
+    },
+    /* Gallery Modal */
+    galleryOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.9)",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    galleryContainer: {
+        width: width,
+        height: height,
+        position: "relative",
+    },
+    galleryClose: {
+        position: "absolute",
+        top: 50,
+        right: 20,
+        zIndex: 10,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    galleryCounter: {
+        position: "absolute",
+        top: 50,
+        left: 20,
+        zIndex: 10,
+        color: "#fff",
+        fontSize: 14,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
+    },
+    galleryImage: {
+        width: width,
+        height: height,
+    },
+    galleryControls: {
+        position: "absolute",
+        bottom: 50,
+        left: 0,
+        right: 0,
+        flexDirection: "row",
+        justifyContent: "space-between",
+        paddingHorizontal: 20,
+    },
+    galleryControl: {
+        backgroundColor: "rgba(0,0,0,0.5)",
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    /* Call Modals */
+    callOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.8)",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    callContainer: {
+        backgroundColor: "#fff",
+        borderRadius: 16,
+        padding: 24,
+        alignItems: "center",
+        width: width * 0.8,
+    },
+    callTitle: {
+        fontSize: 20,
+        fontWeight: "700",
+        color: "#333",
+        marginBottom: 8,
+    },
+    callerName: {
+        fontSize: 18,
+        color: "#10ca8c",
+        marginBottom: 24,
+    },
+    callActions: {
+        flexDirection: "row",
+        gap: 20,
+    },
+    callButton: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    acceptButton: {
+        backgroundColor: "#4caf50",
+    },
+    rejectButton: {
+        backgroundColor: "#f44336",
+    },
+    videoCallOverlay: {
+        flex: 1,
+        backgroundColor: "#000",
+    },
+    videoCallContainer: {
+        flex: 1,
+        position: "relative",
+    },
+    remoteVideo: {
+        flex: 1,
+        backgroundColor: "#111",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    localVideo: {
+        position: "absolute",
+        top: 50,
+        right: 20,
+        width: 120,
+        height: 160,
+        backgroundColor: "#222",
+        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: "#10ca8c",
+        overflow: "hidden",
+    },
+    localVideoPlaceholder: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    waitingContainer: {
+        alignItems: "center",
+    },
+    waitingText: {
+        color: "#fff",
+        marginTop: 12,
+        fontSize: 14,
+    },
+    videoCallControls: {
+        position: "absolute",
+        bottom: 40,
+        left: 0,
+        right: 0,
+        flexDirection: "row",
+        justifyContent: "center",
+        gap: 20,
+    },
+    videoCallControl: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: "rgba(255,255,255,0.2)",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    endCallControl: {
+        backgroundColor: "#f44336",
+    },
+});the chat is not working at all the  i cannot rvrn see when users are typing or wh
+they are online but it works on the webs the messages are not transmitting int real time and the call is not also
+working on the app and also the enntire chat ios not working and i also want a reloading effect but now ith
+chat also doesnt aviod the key board too i want the full bversion of this screen that works please as the web exact
+import { io, Socket } from "socket.io-client";
+
+const SOCKET_URL = "https://vizit-backend-hubw.onrender.com";
+
+let socket: Socket | null = null;
+
+/**
+ * Connect socket ONCE per user
+ * @param userId - current logged-in user ID
+ * @param onOnlineUsersUpdate - callback when online users change
+ * @returns The socket instance or null if userId is missing
+ */
+export const connectSocket = (
+    userId: string | null | undefined,
+    onOnlineUsersUpdate?: (onlineIds: string[]) => void
+): Socket | null => {
+    if (!userId) {
+        console.warn("❌ Socket connection blocked: userId missing");
+        return null;
+    }
+
+    if (socket) return socket; // already connected
+
+    socket = io(SOCKET_URL, {
+        auth: { userId },
+        transports: ["websocket"],
+        withCredentials: true,
+        reconnectionAttempts: 5,
+        timeout: 10000,
+    });
+
+    socket.on("connect", () => {
+        console.log("✅ Socket connected:", socket?.id);
+    });
+
+    socket.on("disconnect", (reason: string) => {
+        console.log("❌ Socket disconnected:", reason);
+    });
+
+    socket.on("connect_error", (err: Error) => {
+        console.error("⚠️ Socket error:", err?.message || err);
+    });
+
+    if (onOnlineUsersUpdate) {
+        socket.on("getOnlineUsers", (onlineIds: string[]) => {
+            onOnlineUsersUpdate(onlineIds);
+        });
+    }
+
+    return socket;
+};
+
+/**
+ * Disconnect socket (logout / app close)
+ */
+export const disconnectSocket = (): void => {
+    if (!socket) return;
+    socket.removeAllListeners();
+    socket.disconnect();
+    socket = null;
+};
+
+/**
+ * Access existing socket inside components
+ * @returns The current socket instance or null if not connected
+ */
+export const getSocket = (): Socket | null => socket;
+
+// Type definitions for socket events
+export interface SocketEvents {
+    // Server -> Client events
+    "getOnlineUsers": (onlineIds: string[]) => void;
+    "newMessage": (message: any) => void;
+    "messagesRead": (data: { byUserId: string }) => void;
+    "typingStatus": (data: { byUserId: string; isTyping: boolean }) => void;
+    "incoming:call": (data: { fromUserId: string; offer: any; callerName: string }) => void;
+    "call:accepted": (data: { answer: any }) => void;
+    "call:rejected": () => void;
+    "call:end": () => void;
+    
+    // Client -> Server events
+    "registerUser": (userId: string) => void;
+    "typing": (data: { chatUserId: string; isTyping: boolean }) => void;
+    "markMessagesRead": (data: { chatUserId: string; readerId: string }) => void;
+    "user:call": (data: { toUserId: string; offer: any; callerName: string }) => void;
+    "call:accepted": (data: { toUserId: string; answer: any }) => void;
+    "call:rejected": (data: { toUserId: string }) => void;
+    "call:end": (data: { toUserId: string }) => void;
+}
+
+// Helper type for typed socket emits
+export type TypedSocket = Socket & {
+    emit: <E extends keyof SocketEvents>(
+        event: E,
+        ...args: Parameters<SocketEvents[E]>
+    ) => boolean;
+    on: <E extends keyof SocketEvents>(
+        event: E,
+        listener: SocketEvents[E]
+    ) => this;
+};
+
+// Helper to get typed socket
+export const getTypedSocket = (): TypedSocket | null => {
+    return socket as TypedSocket | null;
+};
