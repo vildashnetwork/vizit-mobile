@@ -28,7 +28,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Video } from 'expo-av';
 
 const { width } = Dimensions.get('window');
-const API_BASE = "https://vizit-backend-hubw.onrender.com/api/house";
+const API_BASE = "https://auth.vizit.homes/api/house";
 
 // Property Types with Icons
 const propertyTypes = [
@@ -143,7 +143,7 @@ export default function CreatePropertyScreen() {
         }
 
         const response = await axios.get(
-          `https://vizit-backend-hubw.onrender.com/api/owner/decode/token/owner`,
+          `https://auth.vizit.homes/api/owner/decode/token/owner`,
           {
             headers: {
               Authorization: `Bearer ${token}`
@@ -514,7 +514,7 @@ export default function CreatePropertyScreen() {
       ))}
     </View>
   );
-  const options = ["day", "month", "night"];
+  const options = ["day", "month", "night", "forever", "year"];
   const renderBasicInfo = () => (
     <View style={styles.stepContainer}>
       <Text style={styles.sectionTitle}>Basic Information</Text>

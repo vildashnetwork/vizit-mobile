@@ -1,40 +1,126 @@
-#include <iostream>
-
-using namespace std;
-
-class employee{
-public:
-    int employyeID;
-    char name[100];
-    double salary;
-
-
-    void setEmployee(int id , char name[100] ){
-         cout<<"my name is"<<name<<" and my id is  "<<id<<endl;
-    }
-     void setEmployee(int id , char name[100] , double salary){
-          cout<<"my name is"<< name<< " and my id is "<<id<< "and my salary is "<<salary<<endl;
-    }
-
-    void calculateAnnualSalary(int months, double salary){
-        double annualSalary = (salary / months) * 12;
-        cout << "Annual Salary: " << annualSalary << endl;
-    }
-
-};
-
-int main()
 {
-
-employee emp;
-emp.setEmployee(2, "che fortune");
-emp.setEmployee(4, "orsa blissz");
-
-    return 0;
+  "expo": {
+    "name": "vizit-mobile",
+    "slug": "vizit-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "vizitmobile",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "homes.vizit.mobile",
+      "deploymentTarget": "15.1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses the camera for video calls",
+        "NSMicrophoneUsageDescription": "This app uses the microphone for video calls",
+        "NSPhotoLibraryUsageDescription": "This app needs access to photo library to send images",
+        "UIBackgroundModes": ["audio"]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "homes.vizit.mobile",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CHANGE_NETWORK_STATE",
+        "android.permission.ACCESS_WIFI_STATE",
+        "android.permission.BLUETOOTH",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.INTERNET"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true,
+            "minSdkVersion": 24,
+            "targetSdkVersion": 34,
+            "compileSdkVersion": 34
+          },
+          "ios": {
+            "deploymentTarget": "15.1"
+          }
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera for video calls."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos to send images."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos.",
+          "savePhotosPermission": "Allow $(PRODUCT_NAME) to save photos.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone for video calls."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "your-project-id-here"
+      }
+    }
+  }
 }
-emp.setEmployee(3, "john doe", 50000.0);
-emp.setEmployee(5, "jane smith", 65000.0);
 
-employee emp2;
-emp2.setEmployee(6, "mike wilson");
-emp2.setEmployee(7, "sarah jones", 75000.0);
+
+
+# Install EAS CLI
+npm install -g eas-cli
+
+# Login to Expo
+eas login
+
+# Configure
+eas build:configure
+
+# Update your project ID in app.json (replace "your-project-id-here")
+
+# Create development build (takes 5-15 mins)
+eas build --platform android --profile development
+
+# Install the APK on your phone
+# Then run with:
+npx expo start --dev-client
+npm uninstall react-native-webrtc

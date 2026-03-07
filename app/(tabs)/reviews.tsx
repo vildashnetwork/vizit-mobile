@@ -20,8 +20,8 @@
 
 // const { width } = Dimensions.get("window");
 
-// const API_BASE = "https://vizit-backend-hubw.onrender.com/api/house/houses";
-// const DECODE_OWNER = "https://vizit-backend-hubw.onrender.com/api/owner/decode/token/owner";
+// const API_BASE = "https://auth.vizit.homes/api/house/houses";
+// const DECODE_OWNER = "https://auth.vizit.homes/api/owner/decode/token/owner";
 
 // export default function ReviewsScreen() {
 //     const navigation = useNavigation<any>();
@@ -250,13 +250,13 @@
 //             try {
 //                 // Step 1: Get user email via r.id
 //                 const getuser = await axios.get(
-//                     `https://vizit-backend-hubw.onrender.com/api/user/onlyme/${item.id}`
+//                     `https://auth.vizit.homes/api/user/onlyme/${item.id}`
 //                 );
 //                 if (!getuser?.data?.getuser?.email) return;
 
 //                 // Step 2: Get full profile via email
 //                 const res = await axios.get(
-//                     `https://vizit-backend-hubw.onrender.com/api/user/me/${getuser?.data?.getuser?.email}`
+//                     `https://auth.vizit.homes/api/user/me/${getuser?.data?.getuser?.email}`
 //                 );
 
 //                 if (isMounted) {
@@ -491,8 +491,8 @@ import { useNavigation } from "@react-navigation/native";
 
 const { width } = Dimensions.get("window");
 
-const API_BASE = "https://vizit-backend-hubw.onrender.com/api/house/houses";
-const DECODE_OWNER = "https://vizit-backend-hubw.onrender.com/api/owner/decode/token/owner";
+const API_BASE = "https://auth.vizit.homes/api/house/houses";
+const DECODE_OWNER = "https://auth.vizit.homes/api/owner/decode/token/owner";
 
 export default function ReviewsScreen() {
     const navigation = useNavigation<any>();
@@ -733,13 +733,13 @@ function ReviewItem({ item, onReply, onViewDetails }: { item: any, onReply: any,
             try {
                 // Step 1: Get user email via r.id
                 const getuser = await axios.get(
-                    `https://vizit-backend-hubw.onrender.com/api/user/onlyme/${item.id}`
+                    `https://auth.vizit.homes/api/user/onlyme/${item.id}`
                 );
                 if (!getuser?.data?.getuser?.email) return;
 
                 // Step 2: Get full profile via email
                 const res = await axios.get(
-                    `https://vizit-backend-hubw.onrender.com/api/user/me/${getuser?.data?.getuser?.email}`
+                    `https://auth.vizit.homes/api/user/me/${getuser?.data?.getuser?.email}`
                 );
 
                 if (isMounted) {

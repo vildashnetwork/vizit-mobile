@@ -24,7 +24,7 @@ import * as Linking from 'expo-linking';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
-const BASE_URL = "https://vizit-backend-hubw.onrender.com";
+const BASE_URL = "https://auth.vizit.homes";
 
 /* ================= TYPES ================= */
 

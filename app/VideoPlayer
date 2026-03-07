@@ -1,0 +1,82 @@
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { RTCView } from 'react-native-webrtc';
+
+interface VideoPlayerProps {
+    stream: MediaStream | null;
+    name: string;
+    muted?: boolean;
+    isVideoOff?: boolean;
+    mirror?: boolean;
+}
+
+const VideoPlayer: React.FC<VideoPlayerProps> = ({
+    stream,
+    name,
+    muted = false,
+    isVideoOff = false,
+    mirror = false,
+}) => {
+    return (
+        <View style={styles.container}>
+            {stream && !isVideoOff ? (
+                <RTCView
+                    streamURL={stream.toURL()}
+                    style={styles.video}
+                    objectFit="cover"
+                    mirror={mirror}
+                    zOrder={muted ? 1 : 0}
+                />
+            ) : (
+                <View style={styles.placeholder}>
+                    <Text style={styles.placeholderText}>
+                        {isVideoOff ? 'Camera Off' : name}
+                    </Text>
+                </View>
+            )}
+            {muted && (
+                <View style={styles.mutedIndicator}>
+                    <Text style={styles.mutedText}>Mic Off</Text>
+                </View>
+            )}
+        </View>
+    );
+};
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#1a1a1a',
+        position: 'relative',
+    },
+    video: {
+        flex: 1,
+        width: '100%',
+        height: '100%',
+    },
+    placeholder: {
+        flex: 1,
+        backgroundColor: '#2a2a2a',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    placeholderText: {
+        color: '#fff',
+        fontSize: 16,
+    },
+    mutedIndicator: {
+        position: 'absolute',
+        top: 10,
+        left: 10,
+        backgroundColor: 'rgba(255,0,0,0.7)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
+    },
+    mutedText: {
+        color: '#fff',
+        fontSize: 12,
+    },
+});
+
+export default VideoPlayer;

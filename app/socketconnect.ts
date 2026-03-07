@@ -12,7 +12,7 @@ interface ClientToServerEvents {
     // Example: sendMessage: (msg: string) => void;
 }
 
-const SOCKET_URL = "https://vizit-backend-hubw.onrender.com";
+const SOCKET_URL = "https://auth.vizit.homes";
 
 // Type the socket variable with our custom interfaces
 let socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
@@ -63,4 +63,4 @@ export const disconnectSocket = (): void => {
     socket = null;
 };
 
-export const getSocket = (): Socket<ServerToClientEvents, ClientToServerEvents> | null => socket;mess
+export const getSocket = (): Socket<ServerToClientEvents, ClientToServerEvents> | null => socket;

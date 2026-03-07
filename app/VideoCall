@@ -1,0 +1,466 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+    View,
+    Text,
+    StyleSheet,
+    TouchableOpacity,
+    Modal,
+    Dimensions,
+    Alert,
+    PanResponder,
+    Animated,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import {
+    mediaDevices,
+    RTCPeerConnection,
+    RTCSessionDescription,
+    RTCIceCandidate,
+    MediaStream,
+} from 'react-native-webrtc';
+import { getSocket } from './me';
+import VideoPlayer from './VideoPlayer';
+
+const { width, height } = Dimensions.get('window');
+
+const configuration = {
+    iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        {
+            urls: [
+                "stun:stun.relay.metered.ca:80",
+                "turn:global.relay.metered.ca:80",
+                "turn:global.relay.metered.ca:80?transport=tcp",
+                "turn:global.relay.metered.ca:443",
+                "turns:global.relay.metered.ca:443?transport=tcp"
+            ],
+            username: "23dd2c881c792610daaef11f",
+            credential: "J2wwbRWdLWsRYv5T",
+        },
+    ],
+};
+
+class PeerConnectionManager {
+    private peerConnection: RTCPeerConnection | null = null;
+    private localStream: MediaStream | null = null;
+    private remoteStream: MediaStream | null = null;
+    private onRemoteStreamCallback: ((stream: MediaStream) => void) | null = null;
+    private onConnectionStateCallback: ((state: string) => void) | null = null;
+    private pendingCandidates: RTCIceCandidate[] = [];
+    public targetUserId: string | null = null;
+    private iceHandler: ((candidate: RTCIceCandidate) => void) | null = null;
+
+    private optimizeAudioSDP(sdp: string): string {
+        return sdp.replace("useinbandfec=1", "useinbandfec=1; stereo=0; sprop-maxcapturerate=16000");
+    }
+
+    setIceCandidateHandler(fn: (candidate: RTCIceCandidate) => void) {
+        this.iceHandler = fn;
+    }
+
+    async createPeerConnection() {
+        this.peerConnection = new RTCPeerConnection(configuration);
+        
+        this.peerConnection.onicecandidate = (event) => {
+            if (!event.candidate) return;
+            
+            if (this.iceHandler) {
+                this.iceHandler(event.candidate);
+            } else {
+                this.pendingCandidates.push(event.candidate);
+            }
+        };
+
+        this.peerConnection.ontrack = (event) => {
+            if (event.streams && event.streams[0]) {
+                this.remoteStream = event.streams[0];
+                this.onRemoteStreamCallback?.(this.remoteStream);
+            }
+        };
+
+        this.peerConnection.oniceconnectionstatechange = () => {
+            this.onConnectionStateCallback?.(this.peerConnection?.iceConnectionState || '');
+        };
+    }
+
+    async startLocalStream() {
+        try {
+            this.localStream = await mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: false,
+                    channelCount: 1
+                },
+                video: {
+                    width: 640,
+                    height: 480,
+                    frameRate: 30,
+                },
+            });
+            return this.localStream;
+        } catch (error) {
+            console.error("Failed to get local stream:", error);
+            throw error;
+        }
+    }
+
+    async addLocalStreamToPeer() {
+        if (!this.peerConnection || !this.localStream) return;
+        
+        this.localStream.getTracks().forEach(track => {
+            this.peerConnection?.addTrack(track, this.localStream!);
+        });
+    }
+
+    async createOffer(targetUserId: string) {
+        this.targetUserId = targetUserId;
+        await this.createPeerConnection();
+        await this.addLocalStreamToPeer();
+        
+        const offer = await this.peerConnection!.createOffer();
+        offer.sdp = this.optimizeAudioSDP(offer.sdp);
+        await this.peerConnection!.setLocalDescription(offer);
+        
+        return offer;
+    }
+
+    async createAnswer(offer: RTCSessionDescription, fromUserId: string) {
+        this.targetUserId = fromUserId;
+        await this.createPeerConnection();
+        await this.addLocalStreamToPeer();
+        
+        await this.peerConnection!.setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await this.peerConnection!.createAnswer();
+        answer.sdp = this.optimizeAudioSDP(answer.sdp);
+        await this.peerConnection!.setLocalDescription(answer);
+        
+        await this.flushCandidates();
+        return answer;
+    }
+
+    async setRemoteDescription(desc: RTCSessionDescription) {
+        await this.peerConnection!.setRemoteDescription(new RTCSessionDescription(desc));
+        await this.flushCandidates();
+    }
+
+    async addIceCandidate(candidate: RTCIceCandidate) {
+        if (this.peerConnection?.remoteDescription) {
+            await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        } else {
+            this.pendingCandidates.push(candidate);
+        }
+    }
+
+    async flushCandidates() {
+        for (const candidate of this.pendingCandidates) {
+            await this.peerConnection?.addIceCandidate(new RTCIceCandidate(candidate));
+        }
+        this.pendingCandidates = [];
+    }
+
+    setOnRemoteStream(callback: (stream: MediaStream) => void) {
+        this.onRemoteStreamCallback = callback;
+    }
+
+    setOnConnectionState(callback: (state: string) => void) {
+        this.onConnectionStateCallback = callback;
+    }
+
+    getLocalStream() {
+        return this.localStream;
+    }
+
+    getRemoteStream() {
+        return this.remoteStream;
+    }
+
+    close() {
+        this.localStream?.getTracks().forEach(track => track.stop());
+        this.peerConnection?.close();
+        this.peerConnection = null;
+        this.localStream = null;
+        this.remoteStream = null;
+        this.targetUserId = null;
+        this.pendingCandidates = [];
+    }
+
+    toggleAudio() {
+        if (this.localStream) {
+            this.localStream.getAudioTracks().forEach(track => {
+                track.enabled = !track.enabled;
+            });
+        }
+    }
+
+    toggleVideo() {
+        if (this.localStream) {
+            this.localStream.getVideoTracks().forEach(track => {
+                track.enabled = !track.enabled;
+            });
+        }
+    }
+}
+
+interface VideoCallProps {
+    visible: boolean;
+    onClose: () => void;
+    remoteUserId: string;
+    remoteUserName: string;
+    isCaller?: boolean;
+    offer?: any;
+    onCallAccepted?: () => void;
+    onCallRejected?: () => void;
+}
+
+const VideoCall: React.FC<VideoCallProps> = ({
+    visible,
+    onClose,
+    remoteUserId,
+    remoteUserName,
+    isCaller = true,
+    offer,
+    onCallAccepted,
+    onCallRejected,
+}) => {
+    const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+    const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+    const [isMuted, setIsMuted] = useState(false);
+    const [isVideoOff, setIsVideoOff] = useState(false);
+    const [callStatus, setCallStatus] = useState<string>(
+        isCaller ? "Calling..." : "Connecting..."
+    );
+    const [isSmallScreen, setIsSmallScreen] = useState(false);
+    const [position] = useState(new Animated.ValueXY({ x: 20, y: 80 }));
+
+    const peerManager = useRef(new PeerConnectionManager());
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => isSmallScreen,
+            onPanResponderMove: Animated.event(
+                [null, { dx: position.x, dy: position.y }],
+                { useNativeDriver: false }
+            ),
+            onPanResponderRelease: () => {},
+        })
+    ).current;
+
+    useEffect(() => {
+        const socket = getSocket();
+
+        peerManager.current.setOnRemoteStream((stream) => {
+            setRemoteStream(stream);
+        });
+
+        peerManager.current.setOnConnectionState((state) => {
+            setCallStatus(state);
+        });
+
+        const initializeCall = async () => {
+            try {
+                const stream = await peerManager.current.startLocalStream();
+                setLocalStream(stream);
+
+                if (isCaller) {
+                    const offer = await peerManager.current.createOffer(remoteUserId);
+                    socket?.emit("user:call", {
+                        toUserId: remoteUserId,
+                        offer: JSON.stringify(offer),
+                        callerName: remoteUserName,
+                    });
+                } else {
+                    if (offer) {
+                        const answer = await peerManager.current.createAnswer(
+                            JSON.parse(offer),
+                            remoteUserId
+                        );
+                        socket?.emit("call:accepted", {
+                            toUserId: remoteUserId,
+                            answer: JSON.stringify(answer),
+                        });
+                        onCallAccepted?.();
+                    }
+                }
+            } catch (error) {
+                console.error("Call initialization failed:", error);
+                Alert.alert("Error", "Failed to start video call");
+                onClose();
+            }
+        };
+
+        if (visible) {
+            initializeCall();
+        }
+
+        return () => {
+            peerManager.current.close();
+        };
+    }, [visible, isCaller, remoteUserId]);
+
+    const toggleMute = () => {
+        peerManager.current.toggleAudio();
+        setIsMuted(!isMuted);
+    };
+
+    const toggleVideo = () => {
+        peerManager.current.toggleVideo();
+        setIsVideoOff(!isVideoOff);
+    };
+
+    const endCall = () => {
+        const socket = getSocket();
+        socket?.emit("call:end", { toUserId: remoteUserId });
+        peerManager.current.close();
+        onClose();
+    };
+
+    if (!visible) return null;
+
+    return (
+        <Modal visible={visible} transparent={true} animationType="slide">
+            <View style={styles.container}>
+                {/* Remote Video (Large) */}
+                <View style={styles.remoteVideo}>
+                    <VideoPlayer
+                        stream={remoteStream}
+                        name={remoteUserName}
+                        isVideoOff={false}
+                    />
+                </View>
+
+                {/* Local Video (Small, Draggable) */}
+                <Animated.View
+                    style={[
+                        styles.localVideo,
+                        isSmallScreen ? styles.localVideoSmall : styles.localVideoLarge,
+                        { transform: position.getTranslateTransform() },
+                    ]}
+                    {...panResponder.panHandlers}
+                >
+                    <TouchableOpacity
+                        style={styles.localVideoTouchable}
+                        onPress={() => setIsSmallScreen(!isSmallScreen)}
+                        activeOpacity={1}
+                    >
+                        <VideoPlayer
+                            stream={localStream}
+                            name="You"
+                            muted={true}
+                            isVideoOff={isVideoOff}
+                            mirror={true}
+                        />
+                    </TouchableOpacity>
+                </Animated.View>
+
+                {/* Call Controls */}
+                <View style={styles.controls}>
+                    <TouchableOpacity style={styles.controlButton} onPress={toggleMute}>
+                        <Ionicons
+                            name={isMuted ? "mic-off" : "mic"}
+                            size={24}
+                            color="#fff"
+                        />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.controlButton} onPress={toggleVideo}>
+                        <Ionicons
+                            name={isVideoOff ? "videocam-off" : "videocam"}
+                            size={24}
+                            color="#fff"
+                        />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.controlButton, styles.endCallButton]}
+                        onPress={endCall}
+                    >
+                        <Ionicons name="call" size={24} color="#fff" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.controlButton}
+                        onPress={() => setIsSmallScreen(!isSmallScreen)}
+                    >
+                        <Ionicons
+                            name={isSmallScreen ? "expand" : "contract"}
+                            size={24}
+                            color="#fff"
+                        />
+                    </TouchableOpacity>
+                </View>
+
+                {/* Call Status */}
+                <View style={styles.statusContainer}>
+                    <Text style={styles.statusText}>{callStatus}</Text>
+                </View>
+            </View>
+        </Modal>
+    );
+};
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#000',
+    },
+    remoteVideo: {
+        flex: 1,
+        backgroundColor: '#1a1a1a',
+    },
+    localVideo: {
+        position: 'absolute',
+        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: '#10ca8c',
+        overflow: 'hidden',
+        backgroundColor: '#2a2a2a',
+    },
+    localVideoSmall: {
+        width: 120,
+        height: 160,
+    },
+    localVideoLarge: {
+        width: 150,
+        height: 200,
+    },
+    localVideoTouchable: {
+        flex: 1,
+    },
+    controls: {
+        position: 'absolute',
+        bottom: 40,
+        left: 0,
+        right: 0,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 20,
+    },
+    controlButton: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    endCallButton: {
+        backgroundColor: '#f44336',
+    },
+    statusContainer: {
+        position: 'absolute',
+        top: 50,
+        left: 20,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
+    },
+    statusText: {
+        color: '#fff',
+        fontSize: 14,
+    },
+});
+
+export default VideoCall;

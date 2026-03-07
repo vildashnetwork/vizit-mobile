@@ -81,7 +81,7 @@ export default function TabOneScreen() {
             // Check if owner email exists
             if (item.owner?.email) {
               const res = await axios.get(
-                `https://vizit-backend-hubw.onrender.com/api/user/me/${item.owner.email}`
+                `https://auth.vizit.homes/api/user/me/${item.owner.email}`
               );
               return {
                 ...item,
@@ -114,7 +114,7 @@ export default function TabOneScreen() {
   const fetchHouses = async () => {
     try {
       const res = await axios.get(
-        "https://vizit-backend-hubw.onrender.com/api/house/houses"
+        "https://auth.vizit.homes/api/house/houses"
       );
       const rawHouses = res.data.houses || [];
       const sortedHouses = await fetchAndSortListings(rawHouses);
@@ -349,7 +349,7 @@ function PropertyCard({ property, isFirstVerified }: { property: Property; isFir
         const token = await AsyncStorage.getItem("userToken");
         if (!token) return;
         const res = await axios.get(
-          "https://vizit-backend-hubw.onrender.com/api/owner/decode/token/owner",
+          "https://auth.vizit.homes/api/owner/decode/token/owner",
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (res.status === 200) setUser(res.data.user);

@@ -2,6 +2,7 @@
 
 
 import React, { useState, useEffect, useCallback } from "react";
+import Entypo from '@expo/vector-icons/Entypo';
 import {
     StyleSheet,
     FlatList,
@@ -25,7 +26,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 
 const { width } = Dimensions.get("window");
-const API_BASE = "https://vizit-backend-hubw.onrender.com/api";
+const API_BASE = "https://auth.vizit.homes/api";
 
 type Property = {
     _id: string;
@@ -129,7 +130,7 @@ export default function MyHouses() {
         } catch (error) {
             console.error("Failed to decode token:", error);
             Alert.alert("Error", "Session expired. Please login again.");
-            router.push("/owner/login");
+            router.push("/Login");
             return null;
         }
     };
@@ -514,8 +515,8 @@ export default function MyHouses() {
             {/* Header with Gradient */}
             <LinearGradient colors={["#10ca8c", "#00976a"]} style={styles.header}>
                 <View style={styles.headerTop}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                        <Ionicons name="arrow-back" size={24} color="#fff" />
+                    <TouchableOpacity onPress={() => router.push("/")} style={styles.backButton}>
+                        <Entypo name="home" size={24} color="#fff" />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>My Properties</Text>
                     <TouchableOpacity
@@ -670,7 +671,10 @@ export default function MyHouses() {
                     <View style={styles.propertyCard}>
                         <TouchableOpacity
                             activeOpacity={0.7}
-                            onPress={() => router.push(`/owner/property/${item._id}`)}
+                            onPress={() => router.push({
+                                pathname: "/Property",
+                                params: { propertyId: item._id, currentUser: item.owner?.id, ownerId: item.owner?.id },
+                            })}
                         >
                             <View style={styles.cardImageContainer}>
                                 <Image
@@ -735,7 +739,10 @@ export default function MyHouses() {
                         <View style={styles.actionButtons}>
                             <TouchableOpacity
                                 style={[styles.actionButton, styles.viewButton]}
-                                onPress={() => router.push(`/owner/property/${item._id}`)}
+                                onPress={() => router.push({
+                                    pathname: "/Property",
+                                    params: { propertyId: item._id, currentUser: item.owner?.id, ownerId: item.owner?.id },
+                                })}
                             >
                                 <Ionicons name="eye-outline" size={20} color="#fff" />
                                 <Text style={styles.actionButtonText}>View</Text>
@@ -778,7 +785,7 @@ export default function MyHouses() {
                         </Text>
                         <TouchableOpacity
                             style={styles.createButton}
-                            onPress={() => router.push("/owner/create-property")}
+                            onPress={() => router.back()}
                         >
                             <LinearGradient
                                 colors={["#10ca8c", "#00976a"]}
@@ -813,10 +820,10 @@ export default function MyHouses() {
                             <>
                                 <TouchableOpacity
                                     style={styles.modalOption}
-                                    onPress={() => {
-                                        setShowOptionsModal(false);
-                                        router.push(`/owner/edit-property/${selectedProperty._id}`);
-                                    }}
+                                // onPress={() => {
+                                //     setShowOptionsModal(false);
+                                //     router.push(`/owner/edit-property/${selectedProperty._id}`);
+                                // }}
                                 >
                                     <View style={[styles.optionIcon, { backgroundColor: "#e3f2fd" }]}>
                                         <Ionicons name="create-outline" size={24} color="#2196f3" />

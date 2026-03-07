@@ -25,9 +25,10 @@ import { Video, ResizeMode } from "expo-av";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter, useLocalSearchParams, router } from "expo-router";
 import { getSocket } from "./socketconnect";
 import * as Haptics from "expo-haptics";
+import AntDesign from '@expo/vector-icons/AntDesign';
 
 const { width, height } = Dimensions.get("window");
 
@@ -232,7 +233,7 @@ const CommentsModal = ({
         try {
             setLoading(true);
             const res = await axios.get(
-                `https://vizit-backend-hubw.onrender.com/api/reels/reel/${reelId}`
+                `https://auth.vizit.homes/api/reels/reel/${reelId}`
             );
             setComments(res.data.reel.comments || []);
         } catch (err) {
@@ -278,7 +279,7 @@ const CommentsModal = ({
         setPosting(true);
         try {
             await axios.post(
-                `https://vizit-backend-hubw.onrender.com/api/reels/reel/${reelId}/comment`,
+                `https://auth.vizit.homes/api/reels/reel/${reelId}/comment`,
                 {
                     id: currentUser._id,
                     name: currentUser.name,
@@ -304,7 +305,7 @@ const CommentsModal = ({
 
         try {
             await axios.put(
-                `https://vizit-backend-hubw.onrender.com/api/like/reel/${reelId}/comment/${commentId}/like`,
+                `https://auth.vizit.homes/api/like/reel/${reelId}/comment/${commentId}/like`,
                 { id: currentUser._id }
             );
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -621,7 +622,7 @@ const ReelItem = ({
     const fetchReelData = async () => {
         try {
             const res = await axios.get(
-                `https://vizit-backend-hubw.onrender.com/api/reels/reel/${reel._id}`
+                `https://auth.vizit.homes/api/reels/reel/${reel._id}`
             );
 
             const { likes = [], comments = [], shares = [] } = res.data.reel || {};
@@ -644,7 +645,7 @@ const ReelItem = ({
 
         try {
             const res = await axios.get(
-                `https://vizit-backend-hubw.onrender.com/api/user/me/${reel.email}`
+                `https://auth.vizit.homes/api/user/me/${reel.email}`
             );
             setPostOwner(res.data.user);
         } catch (error) {
@@ -854,18 +855,25 @@ const ReelItem = ({
             const loggedInUserId = currentUser._id;
 
             await axios.put(
-                `https://vizit-backend-hubw.onrender.com/api/owner/add/chat/idnow/${loggedInUserId}`,
+                `https://auth.vizit.homes/api/owner/add/chat/idnow/${loggedInUserId}`,
                 { chatId: targetUserId },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
             await axios.put(
-                `https://vizit-backend-hubw.onrender.com/api/owner/add/chat/id/${targetUserId}`,
+                `https://auth.vizit.homes/api/owner/add/chat/id/${targetUserId}`,
                 { chatId: loggedInUserId },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            router.push({
+                pathname: "/MainChat",
+                params: {
+                    chatid: targetUserId,
+                    type: "direct"
+                }
+            })
         } catch (error) {
             console.error("Add chat error:", error);
         } finally {
@@ -1029,7 +1037,7 @@ export default function ReelsScreen() {
             if (!token) return;
 
             const res = await axios.get(
-                "https://vizit-backend-hubw.onrender.com/api/owner/decode/token/owner",
+                "https://auth.vizit.homes/api/owner/decode/token/owner",
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
@@ -1044,7 +1052,7 @@ export default function ReelsScreen() {
     const fetchReels = async () => {
         try {
             const res = await axios.get(
-                "https://vizit-backend-hubw.onrender.com/api/reels/reels"
+                "https://auth.vizit.homes/api/reels/reels"
             );
             if (res.status === 200) {
                 setReels(res.data.reels);
@@ -1068,7 +1076,7 @@ export default function ReelsScreen() {
         if (!currentUser) return;
 
         await axios.post(
-            `https://vizit-backend-hubw.onrender.com/api/reels/reel/${reelId}/like`,
+            `https://auth.vizit.homes/api/reels/reel/${reelId}/like`,
             {
                 id: currentUser._id,
                 name: currentUser.name,
@@ -1095,7 +1103,7 @@ export default function ReelsScreen() {
 
             // Increment share count via API
             await axios.post(
-                `https://vizit-backend-hubw.onrender.com/api/reels/reel/${reelId}/share`,
+                `https://auth.vizit.homes/api/reels/reel/${reelId}/share`,
                 {
                     id: currentUser?._id,
                 }
@@ -1156,11 +1164,18 @@ export default function ReelsScreen() {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
+
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#fff" />
+                    <AntDesign name="home" size={24} color="#fff" />
                 </TouchableOpacity>
+
                 <Text style={styles.headerTitle}>Reels</Text>
-                <View style={styles.headerRight} />
+                {/* <View style={styles.headerRight} /> */}
+
+                <TouchableOpacity onPress={() => router.push("/addreel")} style={styles.backButton}>
+                    <AntDesign name="plus-circle" size={24} color="#fff" />
+                </TouchableOpacity>
+
             </View>
 
             <FlatList

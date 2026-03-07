@@ -17,7 +17,7 @@ import axios from "axios";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
-const API_BASE = "https://vizit-backend-hubw.onrender.com/api";
+const API_BASE = "https://auth.vizit.homes/api";
 
 export default function AppointmentScreen() {
     const router = useRouter();

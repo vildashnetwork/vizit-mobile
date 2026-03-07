@@ -16,6 +16,8 @@ import {
   Modal,
   StatusBar,
 } from "react-native";
+import AntDesign from '@expo/vector-icons/AntDesign';
+import Entypo from '@expo/vector-icons/Entypo';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import axios from "axios";
@@ -55,7 +57,7 @@ const VerifyModal = ({ visible, onClose, email, refreshUser }: VerifyModalProps)
       setError("");
 
       const res = await axios.post(
-        `https://vizit-backend-hubw.onrender.com/api/activate-verification/${email}`,
+        `https://auth.vizit.homes/api/activate-verification/${email}`,
         {
           months,
           verificationFee,
@@ -90,7 +92,7 @@ const VerifyModal = ({ visible, onClose, email, refreshUser }: VerifyModalProps)
       <View style={verifyStyles.overlay}>
         <View style={verifyStyles.modal}>
           <TouchableOpacity style={verifyStyles.closeButton} onPress={onClose}>
-            <Ionicons name="close" size={20} color="#333" />
+            <Entypo name="home" size={24} color="black" />
           </TouchableOpacity>
 
           {/* Step Indicator */}
@@ -179,7 +181,7 @@ const VerifyModal = ({ visible, onClose, email, refreshUser }: VerifyModalProps)
           )}
         </View>
       </View>
-    </Modal>
+    </Modal >
   );
 };
 
@@ -374,7 +376,7 @@ const PaymentModal = ({ visible, onClose, userEmail, userId, userRole, onPayment
       setPaying(true);
 
       const res = await axios.post(
-        "https://vizit-backend-hubw.onrender.com/api/pay",
+        "https://auth.vizit.homes/api/pay",
         {
           phoneNumber: phoneNumber.trim(),
           amount: Number(amount),
@@ -405,17 +407,17 @@ const PaymentModal = ({ visible, onClose, userEmail, userId, userRole, onPayment
         try {
           // Reconcile with NKWA
           await axios.get(
-            "https://vizit-backend-hubw.onrender.com/api/reconcile-payments"
+            "https://auth.vizit.homes/api/reconcile-payments"
           );
 
           // Credit user
           await axios.post(
-            `https://vizit-backend-hubw.onrender.com/api/credit-user/${userEmail}`
+            `https://auth.vizit.homes/api/credit-user/${userEmail}`
           );
 
           // Fetch updated user
           const updatedUser = await axios.get(
-            `https://vizit-backend-hubw.onrender.com/api/user/me/${userEmail}`
+            `https://auth.vizit.homes/api/user/me/${userEmail}`
           );
 
           const latestPayments = updatedUser.data?.user?.paymentprscribtion || [];
@@ -673,7 +675,7 @@ export default function ProfilePage() {
         }
 
         const res = await axios.get(
-          `https://vizit-backend-hubw.onrender.com/api/owner/decode/token/owner`,
+          `https://auth.vizit.homes/api/owner/decode/token/owner`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
@@ -711,7 +713,7 @@ export default function ProfilePage() {
     const fetchBalance = async () => {
       try {
         const res = await axios.get(
-          `https://vizit-backend-hubw.onrender.com/api/user/me/${user.email}`
+          `https://auth.vizit.homes/api/user/me/${user.email}`
         );
         setMyBalance(res.data.user);
       } catch (err) {
@@ -799,7 +801,7 @@ export default function ProfilePage() {
       };
 
       await axios.put(
-        `https://vizit-backend-hubw.onrender.com/api/owner/edit/${user._id}`,
+        `https://auth.vizit.homes/api/owner/edit/${user._id}`,
         payload
       );
 
@@ -829,7 +831,7 @@ export default function ProfilePage() {
     // Refresh balance
     if (user?.email) {
       const res = await axios.get(
-        `https://vizit-backend-hubw.onrender.com/api/user/me/${user.email}`
+        `https://auth.vizit.homes/api/user/me/${user.email}`
       );
       setMyBalance(res.data.user);
     }
@@ -858,10 +860,18 @@ export default function ProfilePage() {
           {/* Header with Back Button */}
           <View style={styles.header}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color="#333" />
+              <Entypo name="home" size={24} color="green" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Profile</Text>
-            <View style={styles.headerRight} />
+            {/* <View style={styles.headerRight} /> */}
+            <TouchableOpacity
+              // style={[styles.actionButton, styles.editButton]}
+              onPress={startEdit}
+            >
+              <AntDesign name="edit" size={24} color="green" />
+
+            </TouchableOpacity>
+
           </View>
 
           {/* Avatar */}
