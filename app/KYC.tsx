@@ -16,11 +16,14 @@ import {
     SafeAreaView,
 } from "react-native";
 import axios from "axios";
+import * as WebBrowser from 'expo-web-browser';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
+import Entypo from '@expo/vector-icons/Entypo';
+import Feather from '@expo/vector-icons/Feather';
 
 const { width, height } = Dimensions.get("window");
 const BASE_URL = "https://auth.vizit.homes/api/kyc";
@@ -295,6 +298,24 @@ export default function KYCForm() {
         }
     };
 
+
+    const handleContactSupportdocs = async () => {
+        try {
+            // Open support website in browser
+            await WebBrowser.openBrowserAsync('https://docs.vizit.homes/');
+        } catch (error) {
+            Alert.alert("Error", "Could not open browser. Please visit support.vizit.homes manually.");
+        }
+    };
+    const handleContactSupportme = async () => {
+        try {
+            // Open support website in browser
+            await WebBrowser.openBrowserAsync('https://support.vizit.homes/');
+        } catch (error) {
+            Alert.alert("Error", "Could not open browser. Please visit support.vizit.homes manually.");
+        }
+    };
+
     /* ================= NAVIGATE ON APPROVAL ================= */
     useEffect(() => {
         if (formData?.status === "approved") {
@@ -360,12 +381,35 @@ export default function KYCForm() {
                                     </View>
 
                                     {formData.status !== "approved" && (
-                                        <TouchableOpacity
-                                            style={styles.editButton}
-                                            onPress={() => setIsSubmitted(false)}
-                                        >
-                                            <Text style={styles.editButtonText}>Edit Submission</Text>
-                                        </TouchableOpacity>
+                                        <>
+                                            <TouchableOpacity
+                                                style={styles.editButton}
+                                                onPress={() => setIsSubmitted(false)}
+                                            >
+                                                <Text style={styles.editButtonText}>Edit Submission</Text>
+                                            </TouchableOpacity>
+
+
+
+                                            <TouchableOpacity
+                                                style={styles.googleBtn}
+                                                onPress={() => handleContactSupportme()}
+                                            >
+                                                <Feather name="help-circle" size={24} color="#DB4437" />
+                                                <Text style={styles.googleBtnText}>Contact Support</Text>
+                                            </TouchableOpacity>
+
+
+
+                                            <TouchableOpacity
+                                                style={styles.googleBtn}
+                                                onPress={() => handleContactSupportdocs()}
+                                            >
+                                                <Entypo name="documents" size={24} color="#DB4437" />
+                                                <Text style={styles.googleBtnText}>Read Through Our Documentation</Text>
+                                            </TouchableOpacity>
+                                        </>
+
                                     )}
                                 </View>
                             ) : (
@@ -466,6 +510,8 @@ export default function KYCForm() {
                             )}
                         </View>
                     </LinearGradient>
+
+
                 </ScrollView>
             </KeyboardAvoidingView>
         </SafeAreaView>
@@ -711,5 +757,20 @@ const styles = StyleSheet.create({
         color: "#fff",
         fontSize: 16,
         fontWeight: "600",
+    },
+    googleBtn: {
+        flexDirection: 'row',
+        backgroundColor: '#fff',
+        height: 55,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#ddd'
+    },
+    googleBtnText: {
+        marginLeft: 10,
+        fontWeight: '600',
+        color: '#444'
     },
 });
