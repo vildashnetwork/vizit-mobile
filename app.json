@@ -8,29 +8,48 @@
     "scheme": "vizitmobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "backgroundColor": "#ffffff",
+    "primaryColor": "#10ca8c",
+    "description": "Vizit Homes - Property Management App",
     "splash": {
       "image": "./assets/images/vizitlogo.jpg",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "notification": {
+      "icon": "./assets/images/vizitlogo.jpg",
+      "color": "#10ca8c",
+      "iosDisplayInForeground": true,
+      "androidMode": "default",
+      "androidCollapsedTitle": "Vizit Homes"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "homes.vizit.mobile",
+      "buildNumber": "1.0.0",
       "deploymentTarget": "15.1",
       "infoPlist": {
-        "NSCameraUsageDescription": "This app uses the camera for video calls",
-        "NSMicrophoneUsageDescription": "This app uses the microphone for video calls",
-        "NSPhotoLibraryUsageDescription": "This app needs access to photo library to send images",
+        "NSCameraUsageDescription": "Vizit Homes needs camera access for video calls and profile photos",
+        "NSMicrophoneUsageDescription": "Vizit Homes needs microphone access for video calls",
+        "NSPhotoLibraryUsageDescription": "Vizit Homes needs photo library access to share images and videos",
+        "NSPhotoLibraryAddUsageDescription": "Vizit Homes needs permission to save photos to your library",
         "UIBackgroundModes": [
-          "audio"
-        ]
+          "audio",
+          "fetch",
+          "remote-notification"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "config": {
+        "usesNonExemptEncryption": false
       }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/vizitlogo.jpg",
+        "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "versionCode": 1,
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "homes.vizit.mobile",
@@ -49,8 +68,11 @@
         "android.permission.ACCESS_MEDIA_LOCATION",
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
-        "android.permission.READ_MEDIA_AUDIO"
-      ]
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.WAKE_LOCK"
+      ],
+      "softwareKeyboardLayoutMode": "pan"
     },
     "web": {
       "bundler": "metro",
