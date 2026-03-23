@@ -29,6 +29,7 @@ import axios from "axios";
 import { TouchableOpacity } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import NetInfo from "@react-native-community/netinfo";
+import Fontisto from '@expo/vector-icons/Fontisto';
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const SIDEBAR_WIDTH = 240;
@@ -36,6 +37,7 @@ import Entypo from '@expo/vector-icons/Entypo';
 import * as WebBrowser from 'expo-web-browser';
 import Foundation from '@expo/vector-icons/Foundation';
 
+const BAS_URL = "https://auth.vizit.homes"
 // Types
 type User = {
   _id: string;
@@ -487,6 +489,12 @@ export default function TabLayout() {
             <Text style={styles.itemText}>Home</Text>
           </Pressable>
 
+
+          <Pressable style={styles.item} onPress={() => navigate("/Life")}>
+            <Fontisto name="livestream" size={22} color="black" />
+            <Text style={styles.itemText}>Go Live</Text>
+          </Pressable>
+
           {!user && (
             <Pressable style={styles.item} onPress={() => navigate("/Login")}>
               <Entypo name="login" size={24} color="black" />
@@ -936,3 +944,35 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

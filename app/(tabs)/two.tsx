@@ -42,6 +42,75 @@ const propertyTypes = [
   { value: "Townhouse", icon: "warehouse", family: "MaterialCommunityIcons" }
 ];
 
+// // Amenities Options with Icons
+// const amenityOptions = [
+//   { name: "WiFi", icon: "wifi", family: "Ionicons" },
+//   { name: "Parking", icon: "car", family: "Ionicons" },
+//   { name: "Pool", icon: "pool", family: "MaterialCommunityIcons" },
+//   { name: "Gym", icon: "dumbbell", family: "MaterialCommunityIcons" },
+//   { name: "AC", icon: "snowflake", family: "FontAwesome5" },
+//   { name: "Heating", icon: "fire", family: "Ionicons" },
+//   { name: "Laundry", icon: "washing-machine", family: "MaterialCommunityIcons" },
+//   { name: "Dishwasher", icon: "dishwasher", family: "MaterialCommunityIcons" },
+//   { name: "Pet Friendly", icon: "paw", family: "Ionicons" },
+//   { name: "Balcony", icon: "balcony", family: "MaterialCommunityIcons" },
+//   { name: "Garden", icon: "flower", family: "Ionicons" },
+//   { name: "Security", icon: "security", family: "MaterialCommunityIcons" },
+//   { name: "Elevator", icon: "elevator", family: "MaterialCommunityIcons" },
+//   { name: "Furnished", icon: "sofa", family: "MaterialCommunityIcons" },
+//   { name: "Fireplace", icon: "fireplace", family: "MaterialCommunityIcons" },
+//   { name: "Backup Generator ", icon: "fireplace", family: "MaterialCommunityIcons" },
+//   { name: "24/7 Running Water ", icon: "fireplace", family: "MaterialCommunityIcons" },
+//   { name: "Water Reservoir", icon: "fireplace", family: "MaterialCommunityIcons" },
+//   { name: "Air Conditioning", icon: "fireplace", family: "MaterialCommunityIcons" },
+//   { name: "WIFI", icon: "fireplace", family: "MaterialCommunityIcons" },
+//   { name: "Balcony", icon: "fireplace", family: "MaterialCommunityIcons" },
+//   { name: "24/7 Security", icon: "fireplace", family: "MaterialCommunityIcons" },
+//   { name: "Fenced Compound", icon: "fireplace", family: "MaterialCommunityIcons" },
+//   { name: "Gated Access ", icon: "fireplace", family: "MaterialCommunityIcons" },
+//   { name: "Parking", icon: "fireplace", family: "MaterialCommunityIcons" },
+//   { name: "Furnished", icon: "fireplace", family: "MaterialCommunityIcons" },
+//   { name: "Fitted Kitchen", icon: "fireplace", family: "MaterialCommunityIcons" },
+//   { name: "Hot Water Heater ", icon: "fireplace", family: "MaterialCommunityIcons" },
+//   { name: "High-Speed Internet", icon: "fireplace", family: "MaterialCommunityIcons" },
+//   { name: "Pet-Friendly", icon: "fireplace", family: "MaterialCommunityIcons" },
+//   { name: "Swimming Pool", icon: "fireplace", family: "MaterialCommunityIcons" },
+//   { name: "Near Park", icon: "fireplace", family: "MaterialCommunityIcons" },
+
+// ];
+
+// const getIcon = (amenity) => {
+//   const iconMap = {
+//     "WiFi": { name: "wifi", family: "Ionicons" },
+//     "Parking": { name: "car", family: "Ionicons" },
+//     "Pool": { name: "pool", family: "MaterialCommunityIcons" },
+//     "Gym": { name: "dumbbell", family: "MaterialCommunityIcons" },
+//     "AC": { name: "snowflake", family: "FontAwesome5" },
+//     "Heating": { name: "heating-coil", family: "MaterialCommunityIcons" },
+//     "Laundry": { name: "washing-machine", family: "MaterialCommunityIcons" },
+//     "Dishwasher": { name: "dishwasher", family: "MaterialCommunityIcons" },
+//     "Pet Friendly": { name: "paw", family: "Ionicons" },
+//     "Balcony": { name: "balcony", family: "MaterialCommunityIcons" },
+//     "Garden": { name: "flower", family: "Ionicons" },
+//     "Security": { name: "security", family: "MaterialCommunityIcons" },
+//     "Elevator": { name: "elevator", family: "MaterialCommunityIcons" },
+//     "Furnished": { name: "sofa", family: "MaterialCommunityIcons" },
+//     "Fireplace": { name: "fireplace", family: "MaterialCommunityIcons" }
+//   };
+//   return iconMap[amenity] || { name: "help-circle", family: "Ionicons" };
+// };
+
+
+
+
+
+
+
+
+
+
+
+
 // Amenities Options with Icons
 const amenityOptions = [
   { name: "WiFi", icon: "wifi", family: "Ionicons" },
@@ -58,26 +127,54 @@ const amenityOptions = [
   { name: "Security", icon: "security", family: "MaterialCommunityIcons" },
   { name: "Elevator", icon: "elevator", family: "MaterialCommunityIcons" },
   { name: "Furnished", icon: "sofa", family: "MaterialCommunityIcons" },
-  { name: "Fireplace", icon: "fireplace", family: "MaterialCommunityIcons" }
+  { name: "Fireplace", icon: "fireplace", family: "MaterialCommunityIcons" },
+  { name: "Backup Generator", icon: "generator", family: "MaterialCommunityIcons" },
+  { name: "24/7 Running Water", icon: "water", family: "MaterialCommunityIcons" },
+  { name: "Water Reservoir", icon: "water-pump", family: "MaterialCommunityIcons" },
+  { name: "Air Conditioning", icon: "air-conditioner", family: "MaterialCommunityIcons" },
+  { name: "WIFI", icon: "wifi", family: "Ionicons" },
+  { name: "24/7 Security", icon: "security", family: "MaterialCommunityIcons" },
+  { name: "Fenced Compound", icon: "fence", family: "MaterialCommunityIcons" },
+  { name: "Gated Access", icon: "gate", family: "MaterialCommunityIcons" },
+  { name: "Fitted Kitchen", icon: "kitchen", family: "MaterialCommunityIcons" },
+  { name: "Hot Water Heater", icon: "water-boiler", family: "MaterialCommunityIcons" },
+  { name: "High-Speed Internet", icon: "speedometer", family: "MaterialCommunityIcons" },
+  { name: "Pet-Friendly", icon: "paw", family: "Ionicons" },
+  { name: "Swimming Pool", icon: "pool", family: "MaterialCommunityIcons" },
+  { name: "Near Park", icon: "tree", family: "MaterialCommunityIcons" },
 ];
 
 const getIcon = (amenity) => {
   const iconMap = {
     "WiFi": { name: "wifi", family: "Ionicons" },
+    "WIFI": { name: "wifi", family: "Ionicons" },
     "Parking": { name: "car", family: "Ionicons" },
     "Pool": { name: "pool", family: "MaterialCommunityIcons" },
+    "Swimming Pool": { name: "pool", family: "MaterialCommunityIcons" },
     "Gym": { name: "dumbbell", family: "MaterialCommunityIcons" },
     "AC": { name: "snowflake", family: "FontAwesome5" },
-    "Heating": { name: "heating-coil", family: "MaterialCommunityIcons" },
+    "Air Conditioning": { name: "air-conditioner", family: "MaterialCommunityIcons" },
+    "Heating": { name: "fire", family: "Ionicons" },
     "Laundry": { name: "washing-machine", family: "MaterialCommunityIcons" },
     "Dishwasher": { name: "dishwasher", family: "MaterialCommunityIcons" },
     "Pet Friendly": { name: "paw", family: "Ionicons" },
+    "Pet-Friendly": { name: "paw", family: "Ionicons" },
     "Balcony": { name: "balcony", family: "MaterialCommunityIcons" },
     "Garden": { name: "flower", family: "Ionicons" },
     "Security": { name: "security", family: "MaterialCommunityIcons" },
+    "24/7 Security": { name: "security", family: "MaterialCommunityIcons" },
     "Elevator": { name: "elevator", family: "MaterialCommunityIcons" },
     "Furnished": { name: "sofa", family: "MaterialCommunityIcons" },
-    "Fireplace": { name: "fireplace", family: "MaterialCommunityIcons" }
+    "Fireplace": { name: "fireplace", family: "MaterialCommunityIcons" },
+    "Backup Generator": { name: "generator", family: "MaterialCommunityIcons" },
+    "24/7 Running Water": { name: "water", family: "MaterialCommunityIcons" },
+    "Water Reservoir": { name: "water-pump", family: "MaterialCommunityIcons" },
+    "Fenced Compound": { name: "fence", family: "MaterialCommunityIcons" },
+    "Gated Access": { name: "gate", family: "MaterialCommunityIcons" },
+    "Fitted Kitchen": { name: "kitchen", family: "MaterialCommunityIcons" },
+    "Hot Water Heater": { name: "water-boiler", family: "MaterialCommunityIcons" },
+    "High-Speed Internet": { name: "speedometer", family: "MaterialCommunityIcons" },
+    "Near Park": { name: "tree", family: "MaterialCommunityIcons" },
   };
   return iconMap[amenity] || { name: "help-circle", family: "Ionicons" };
 };
