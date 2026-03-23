@@ -1858,6 +1858,327 @@ interface CommentsModalProps {
     currentUser?: User;
 }
 
+// const CommentsModal = ({
+//     visible,
+//     onClose,
+//     reelId,
+//     commentCount,
+//     currentUser,
+// }: CommentsModalProps) => {
+//     const [comments, setComments] = useState<Comment[]>([]);
+//     const [newComment, setNewComment] = useState("");
+//     const [loading, setLoading] = useState(false);
+//     const [posting, setPosting] = useState(false);
+//     const [keyboardHeight, setKeyboardHeight] = useState(0);
+//     const holdTimeout = useRef<NodeJS.Timeout>();
+//     const flatListRef = useRef<FlatList>(null);
+//     const inputRef = useRef<TextInput>(null);
+
+//     const socket = getSocket();
+
+//     /* ---------------- KEYBOARD LISTENERS ---------------- */
+//     useEffect(() => {
+//         const keyboardWillShow = Keyboard.addListener(
+//             Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+//             (e) => {
+//                 setKeyboardHeight(e.endCoordinates.height);
+//             }
+//         );
+//         const keyboardWillHide = Keyboard.addListener(
+//             Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+//             () => {
+//                 setKeyboardHeight(0);
+//             }
+//         );
+
+//         return () => {
+//             keyboardWillShow.remove();
+//             keyboardWillHide.remove();
+//         };
+//     }, []);
+
+//     /* ---------------- FETCH COMMENTS ---------------- */
+//     const fetchComments = async () => {
+//         try {
+//             setLoading(true);
+//             const res = await axios.get(
+//                 `https://auth.vizit.homes/api/reels/reel/${reelId}`
+//             );
+//             setComments(res.data.reel.comments || []);
+//         } catch (err) {
+//             console.error("FETCH COMMENTS ERROR:", err);
+//         } finally {
+//             setLoading(false);
+//         }
+//     };
+
+//     useEffect(() => {
+//         if (visible) {
+//             fetchComments();
+//             // Auto focus input when modal opens
+//             setTimeout(() => {
+//                 inputRef.current?.focus();
+//             }, 300);
+//         } else {
+//             // Reset keyboard height when modal closes
+//             setKeyboardHeight(0);
+//         }
+//     }, [reelId, visible]);
+
+//     /* ---------------- SOCKET LISTENERS ---------------- */
+//     useEffect(() => {
+//         if (!socket) return;
+
+//         const handleLikeUpdate = ({ reelId: rId, commentId, likes }: any) => {
+//             if (rId !== reelId) return;
+
+//             setComments((prev) =>
+//                 prev.map((comment) =>
+//                     comment._id === commentId
+//                         ? { ...comment, likes }
+//                         : comment
+//                 )
+//             );
+//         };
+
+//         socket.on("commentLikeUpdated", handleLikeUpdate);
+
+//         return () => {
+//             socket.off("commentLikeUpdated", handleLikeUpdate);
+//         };
+//     }, [socket, reelId]);
+
+//     /* ---------------- ADD COMMENT ---------------- */
+//     const handleAddComment = async () => {
+//         if (!newComment.trim() || !currentUser?._id || posting) return;
+
+//         setPosting(true);
+//         try {
+//             await axios.post(
+//                 `https://auth.vizit.homes/api/reels/reel/${reelId}/comment`,
+//                 {
+//                     id: currentUser._id,
+//                     name: currentUser.name,
+//                     email: currentUser.email,
+//                     profile: currentUser.profile,
+//                     text: newComment,
+//                 }
+//             );
+
+//             setNewComment("");
+//             fetchComments();
+//             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+//             // Scroll to bottom to show new comment
+//             setTimeout(() => {
+//                 flatListRef.current?.scrollToEnd({ animated: true });
+//             }, 300);
+//         } catch (err) {
+//             console.error("POST COMMENT ERROR:", err);
+//         } finally {
+//             setPosting(false);
+//         }
+//     };
+
+//     /* ---------------- LIKE COMMENT ---------------- */
+//     const toggleLikeComment = async (commentId: string) => {
+//         if (!currentUser?._id) return;
+
+//         try {
+//             await axios.put(
+//                 `https://auth.vizit.homes/api/like/reel/${reelId}/comment/${commentId}/like`,
+//                 { id: currentUser._id }
+//             );
+//             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+//         } catch (err) {
+//             console.error("LIKE COMMENT ERROR:", err);
+//         }
+//     };
+
+//     /* ---------------- LONG PRESS ---------------- */
+//     const startHold = (commentId: string) => {
+//         holdTimeout.current = setTimeout(() => {
+//             toggleLikeComment(commentId);
+//         }, 500);
+//     };
+
+//     const cancelHold = () => {
+//         clearTimeout(holdTimeout.current);
+//     };
+
+//     return (
+//         <Modal
+//             visible={visible}
+//             animationType="slide"
+//             transparent={true}
+//             onRequestClose={onClose}
+//             statusBarTranslucent={true}
+//         >
+//             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+//                 <View style={styles.modalOverlay}>
+//                     <View style={[
+//                         styles.modalContent,
+//                         { paddingBottom: keyboardHeight > 0 ? keyboardHeight : 0 }
+//                     ]}>
+//                         <View style={styles.modalHeader}>
+//                             <Text style={styles.modalTitle}>
+//                                 Comments ({commentCount})
+//                             </Text>
+//                             <TouchableOpacity onPress={onClose} style={styles.modalClose}>
+//                                 <Ionicons name="close" size={24} color="#333" />
+//                             </TouchableOpacity>
+//                         </View>
+
+//                         {loading ? (
+//                             <View style={styles.commentsLoading}>
+//                                 <ActivityIndicator size="large" color="#10ca8c" />
+//                             </View>
+//                         ) : (
+//                             <FlatList
+//                                 ref={flatListRef}
+//                                 data={comments}
+//                                 keyExtractor={(item) => item._id}
+//                                 style={styles.commentsList}
+//                                 contentContainerStyle={styles.commentsListContent}
+//                                 showsVerticalScrollIndicator={false}
+//                                 keyboardShouldPersistTaps="handled"
+//                                 ListEmptyComponent={
+//                                     <View style={styles.emptyComments}>
+//                                         <Ionicons name="chatbubble-outline" size={40} color="#ccc" />
+//                                         <Text style={styles.emptyCommentsText}>
+//                                             No comments yet. Be the first to comment!
+//                                         </Text>
+//                                     </View>
+//                                 }
+//                                 renderItem={({ item }) => {
+//                                     const hasLiked = item.likes?.some(
+//                                         (like) => String(like.id) === String(currentUser?._id)
+//                                     );
+
+//                                     return (
+//                                         <TouchableOpacity
+//                                             activeOpacity={0.8}
+//                                             onLongPress={() => startHold(item._id)}
+//                                             onPressOut={cancelHold}
+//                                             delayLongPress={500}
+//                                         >
+//                                             <View style={styles.commentItem}>
+//                                                 <Image
+//                                                     source={{
+//                                                         uri: item.profile ||
+//                                                             "https://via.placeholder.com/36",
+//                                                     }}
+//                                                     style={styles.commentAvatar}
+//                                                 />
+//                                                 <View style={styles.commentContent}>
+//                                                     <View style={styles.commentHeader}>
+//                                                         <Text style={styles.commentUsername}>
+//                                                             @{item.name}
+//                                                         </Text>
+//                                                         <Text style={styles.commentTime}>
+//                                                             {item.date
+//                                                                 ? formatTime(item.date)
+//                                                                 : ""}
+//                                                         </Text>
+//                                                     </View>
+//                                                     <Text style={styles.commentText}>
+//                                                         {item.text}
+//                                                     </Text>
+//                                                     <TouchableOpacity
+//                                                         style={styles.commentLike}
+//                                                         onPress={() => toggleLikeComment(item._id)}
+//                                                     >
+//                                                         <Ionicons
+//                                                             name={hasLiked ? "heart" : "heart-outline"}
+//                                                             size={16}
+//                                                             color={hasLiked ? "#ff4444" : "#999"}
+//                                                         />
+//                                                         <Text
+//                                                             style={[
+//                                                                 styles.commentLikeText,
+//                                                                 hasLiked && styles.commentLikedText,
+//                                                             ]}
+//                                                         >
+//                                                             {item.likes?.length || 0}
+//                                                         </Text>
+//                                                     </TouchableOpacity>
+//                                                 </View>
+//                                             </View>
+//                                         </TouchableOpacity>
+//                                     );
+//                                 }}
+//                             />
+//                         )}
+
+//                         {/* Fixed Input Container with Keyboard Avoidance */}
+//                         <KeyboardAvoidingView
+//                             behavior={Platform.OS === "ios" ? "padding" : "height"}
+//                             keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+//                         >
+//                             <View style={styles.commentInputContainer}>
+//                                 <TextInput
+//                                     ref={inputRef}
+//                                     style={styles.commentInput}
+//                                     placeholder="Add a comment..."
+//                                     placeholderTextColor="#999"
+//                                     value={newComment}
+//                                     onChangeText={setNewComment}
+//                                     multiline
+//                                     maxLength={500}
+//                                     returnKeyType="send"
+//                                     blurOnSubmit={false}
+//                                     onSubmitEditing={handleAddComment}
+//                                 />
+//                                 <TouchableOpacity
+//                                     style={[
+//                                         styles.commentPostButton,
+//                                         (!newComment.trim() || posting) &&
+//                                         styles.commentPostButtonDisabled,
+//                                     ]}
+//                                     onPress={handleAddComment}
+//                                     disabled={!newComment.trim() || posting}
+//                                 >
+//                                     {posting ? (
+//                                         <ActivityIndicator size="small" color="#fff" />
+//                                     ) : (
+//                                         <Text style={styles.commentPostButtonText}>Post</Text>
+//                                     )}
+//                                 </TouchableOpacity>
+//                             </View>
+//                         </KeyboardAvoidingView>
+//                     </View>
+//                 </View>
+//             </TouchableWithoutFeedback>
+//         </Modal>
+//     );
+// };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ================= COMMENTS MODAL WITH PROPER KEYBOARD HANDLING ================= */
+
+interface CommentsModalProps {
+    visible: boolean;
+    onClose: () => void;
+    reelId: string;
+    commentCount: number;
+    currentUser?: User;
+}
+
 const CommentsModal = ({
     visible,
     onClose,
@@ -1870,6 +2191,7 @@ const CommentsModal = ({
     const [loading, setLoading] = useState(false);
     const [posting, setPosting] = useState(false);
     const [keyboardHeight, setKeyboardHeight] = useState(0);
+    const [likingCommentId, setLikingCommentId] = useState<string | null>(null);
     const holdTimeout = useRef<NodeJS.Timeout>();
     const flatListRef = useRef<FlatList>(null);
     const inputRef = useRef<TextInput>(null);
@@ -1939,12 +2261,20 @@ const CommentsModal = ({
                         : comment
                 )
             );
+            setLikingCommentId(null);
+        };
+
+        const handleCommentAdded = ({ reelId: rId, comment }: any) => {
+            if (rId !== reelId) return;
+            setComments(prev => [comment, ...prev]);
         };
 
         socket.on("commentLikeUpdated", handleLikeUpdate);
+        socket.on("reel:commentAdded", handleCommentAdded);
 
         return () => {
             socket.off("commentLikeUpdated", handleLikeUpdate);
+            socket.off("reel:commentAdded", handleCommentAdded);
         };
     }, [socket, reelId]);
 
@@ -1982,7 +2312,21 @@ const CommentsModal = ({
 
     /* ---------------- LIKE COMMENT ---------------- */
     const toggleLikeComment = async (commentId: string) => {
-        if (!currentUser?._id) return;
+        if (!currentUser?._id || likingCommentId === commentId) return;
+
+        setLikingCommentId(commentId);
+
+        // Optimistic update
+        setComments(prev => prev.map(comment => {
+            if (comment._id === commentId) {
+                const hasLiked = comment.likes?.some(like => String(like.id) === String(currentUser._id));
+                const newLikes = hasLiked
+                    ? comment.likes?.filter(like => String(like.id) !== String(currentUser._id)) || []
+                    : [...(comment.likes || []), { id: currentUser._id }];
+                return { ...comment, likes: newLikes };
+            }
+            return comment;
+        }));
 
         try {
             await axios.put(
@@ -1992,6 +2336,10 @@ const CommentsModal = ({
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         } catch (err) {
             console.error("LIKE COMMENT ERROR:", err);
+            // Revert on error
+            fetchComments();
+        } finally {
+            setTimeout(() => setLikingCommentId(null), 500);
         }
     };
 
@@ -2054,6 +2402,7 @@ const CommentsModal = ({
                                     const hasLiked = item.likes?.some(
                                         (like) => String(like.id) === String(currentUser?._id)
                                     );
+                                    const isLiking = likingCommentId === item._id;
 
                                     return (
                                         <TouchableOpacity
@@ -2087,20 +2436,27 @@ const CommentsModal = ({
                                                     <TouchableOpacity
                                                         style={styles.commentLike}
                                                         onPress={() => toggleLikeComment(item._id)}
+                                                        disabled={isLiking}
                                                     >
-                                                        <Ionicons
-                                                            name={hasLiked ? "heart" : "heart-outline"}
-                                                            size={16}
-                                                            color={hasLiked ? "#ff4444" : "#999"}
-                                                        />
-                                                        <Text
-                                                            style={[
-                                                                styles.commentLikeText,
-                                                                hasLiked && styles.commentLikedText,
-                                                            ]}
-                                                        >
-                                                            {item.likes?.length || 0}
-                                                        </Text>
+                                                        {isLiking ? (
+                                                            <ActivityIndicator size="small" color="#ff4444" />
+                                                        ) : (
+                                                            <>
+                                                                <Ionicons
+                                                                    name={hasLiked ? "heart" : "heart-outline"}
+                                                                    size={16}
+                                                                    color={hasLiked ? "#ff4444" : "#999"}
+                                                                />
+                                                                <Text
+                                                                    style={[
+                                                                        styles.commentLikeText,
+                                                                        hasLiked && styles.commentLikedText,
+                                                                    ]}
+                                                                >
+                                                                    {item.likes?.length || 0}
+                                                                </Text>
+                                                            </>
+                                                        )}
                                                     </TouchableOpacity>
                                                 </View>
                                             </View>
@@ -2152,7 +2508,6 @@ const CommentsModal = ({
         </Modal>
     );
 };
-
 /* ================= CUSTOM VIDEO CONTROLS ================= */
 
 interface VideoControlsProps {
